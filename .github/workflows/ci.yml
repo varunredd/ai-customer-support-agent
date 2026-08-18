@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "development", "phase-6-submission-hardening"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit tracked submission files
+        run: npm run submission:audit
+
+      - name: Reset deterministic demo state
+        run: npm run demo:reset
+
+      - name: Typecheck, test, and production build
+        run: npm run verify

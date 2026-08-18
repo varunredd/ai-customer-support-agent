@@ -98,17 +98,20 @@ Acceptance gate:
 - Text remains functional when voice is unavailable.
 - `npm run verify` passes locally.
 
-## Phase 6 — Hardening, submission, and demo package
+## Phase 6 — Hardening, submission, and demo package — COMPLETE
 
-Includes:
-- Full regression/build pass.
-- Clean demo reset.
-- Final README and architecture diagram.
-- Public GitHub hygiene and deployment configuration.
-- 7–10 minute walkthrough covering approve, deny, failure/retry, architecture, observability, and optional voice.
-- Final senior-engineering review before submission.
+Delivered:
+- Final public-facing README and architecture documentation.
+- Corrected voice-model documentation to the live-certified `gpt-4o-mini-transcribe` default.
+- Deterministic `demo:reset` command plus explicit fixture certification.
+- Git-tracked-file submission audit for secrets/runtime artifacts.
+- GitHub Actions CI for install → audit → reset → verify.
+- SQLite hosting/persistence guidance.
+- 7–10 minute Loom walkthrough plan covering approval, denial, failure/retry, architecture, observability, and optional voice.
+- Final submission/security checklist.
 
 Acceptance gate:
-- Clean clone → install → reset/seed → verify → run follows README.
-- Required demo paths are deterministic.
-- No secrets, local databases, or generated runtime state are committed.
+- Clean clone → `npm ci` → environment setup → `npm run demo:reset` → `npm run submission:check` → `npm run dev` follows README.
+- Required demo paths start from certified deterministic state.
+- No secrets, local databases, generated runtime state, or overlay/source ZIPs are tracked.
+- Public documentation matches the certified runtime behavior and phase boundaries.

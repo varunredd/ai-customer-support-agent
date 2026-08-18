@@ -42,13 +42,15 @@ No Realtime refund tools are registered. The browser's Realtime session is creat
 
 The server attaches a transcription-only session configuration using:
 
-- `gpt-live-transcribe` by default,
+- `gpt-4o-mini-transcribe` by default,
 - 24 kHz PCM input,
 - near-field noise reduction,
 - server VAD,
 - order/product vocabulary as transcription hints.
 
-The long-lived `OPENAI_API_KEY` never leaves the Next.js server. When minting the client secret, the server also attaches a SHA-256-derived, privacy-preserving safety identifier based on the bound CRM customer; the browser cannot choose or override it. The browser receives only the short-lived `ek_...` credential and uses it to establish WebRTC directly with OpenAI.
+During live Phase 5 certification, the one-turn server-VAD configuration was rejected when the environment requested `gpt-live-transcribe`. The implementation therefore defaults to `gpt-4o-mini-transcribe` and defensively remaps that legacy environment value to the certified model.
+
+The long-lived `OPENAI_API_KEY` never leaves the Next.js server. When minting the client secret, the server also attaches a SHA-256-derived, privacy-preserving safety identifier based on the bound CRM customer; the browser cannot choose or override it. The browser receives only the short-lived Realtime credential and uses it to establish WebRTC directly with OpenAI.
 
 Each microphone activation handles one speech turn. A completed transcript is then submitted through the exact same `/api/support/chat` SSE endpoint used by typed input. Text remains available whenever the microphone, WebRTC connection, or transcription service fails.
 
@@ -59,7 +61,7 @@ Each microphone activation handles one speech turn. A completed transcript is th
 - `sessionId`, and
 - `messageId`.
 
-The server verifies that the requested message is a persisted `AGENT` message belonging to that support session, then synthesizes that persisted text using `gpt-4o-mini-tts` by default.
+The server verifies that the requested message is a persisted `AGENT` message belonging to that support session, then synthesizes that persisted text using the configured TTS model (`gpt-4o-mini-tts` by default in this build).
 
 This keeps browser-controlled text from becoming an unrestricted TTS proxy and guarantees that spoken output matches a persisted support response.
 
@@ -99,4 +101,4 @@ Phase 5 does not change:
 - demo fixtures,
 - production authentication scope.
 
-Phase 6 remains responsible for final deployment, GitHub/README cleanup, reset-and-demo certification, and the 7–10 minute walkthrough.
+Phase 6 owns final clone reproducibility, README/GitHub hygiene, deterministic demo reset, and the recording/submission package.

@@ -32,7 +32,7 @@ function requireApiKey(apiKey: string | undefined) {
 
 function transcribeModel() {
   const requested = process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || "gpt-4o-mini-transcribe";
-  // gpt-live-transcribe rejects server VAD, which this take-home uses for one-turn microphone capture.
+  // Phase 5 live certification rejected the legacy gpt-live-transcribe value with this one-turn server-VAD setup.
   if (requested === "gpt-live-transcribe") return "gpt-4o-mini-transcribe";
   return requested;
 }
