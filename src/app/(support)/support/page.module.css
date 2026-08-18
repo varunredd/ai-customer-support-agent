@@ -237,3 +237,11 @@
     padding: 20px 14px;
   }
 }
+
+.voicePlaybackError {
+  margin: 0;
+  color: var(--error);
+  font-size: 0.78rem;
+  text-align: center;
+  line-height: 1.4;
+}

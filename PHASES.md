@@ -76,19 +76,27 @@ Acceptance gate:
 - Loading, empty, error, retry, approval, and denial states are polished.
 - `npm run verify` passes on the local installed dependency set.
 
-## Phase 5 — Voice bonus
+## Phase 5 — Voice bonus — COMPLETE
 
-Goal: add voice only after the text path is correct.
-
-Planned additions:
-- OpenAI Realtime browser voice connection via WebRTC.
-- Server-created short-lived browser credential/session.
-- Transcript routed through the same deterministic refund tools.
-- Text fallback when realtime/microphone access fails.
+Delivered:
+- OpenAI Realtime transcription connection from the browser via WebRTC.
+- Server-created 60-second Realtime client secret bound to a transcription-only session.
+- Backend-derived privacy-preserving safety identifier attached when minting the Realtime client secret.
+- Single-turn microphone UX with VAD-driven final transcription.
+- Voice transcript routed through the existing `/api/support/chat` Responses-agent path.
+- No Realtime refund tools and no second voice-only refund agent.
+- Persisted-agent-message-only TTS endpoint using OpenAI speech generation.
+- Automatic spoken reply for voice-originated turns plus per-message Listen replay.
+- Clear AI-generated-voice disclosure and typed-text fallback for microphone/WebRTC/TTS failures.
+- Phase 5 tests for credential scope, persisted-message playback authorization, TTS request safety, and Realtime event parsing.
 
 Acceptance gate:
-- Voice cannot bypass deterministic validation.
-- Browser bundle contains no long-lived OpenAI secret.
+- Voice cannot bypass deterministic validation because it reaches refunds only through the existing support-agent endpoint.
+- Realtime browser session is transcription-only and contains no refund tools.
+- Browser receives only a short-lived Realtime client secret; the long-lived OpenAI key remains server-only.
+- Spoken output is generated only from a persisted AGENT message bound to the current support session.
+- Text remains functional when voice is unavailable.
+- `npm run verify` passes locally.
 
 ## Phase 6 — Hardening, submission, and demo package
 

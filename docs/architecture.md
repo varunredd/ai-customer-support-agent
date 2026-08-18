@@ -1,4 +1,4 @@
-# Architecture — Phase 3
+# Architecture — Phase 5
 
 ## Deployment boundary
 
@@ -13,7 +13,7 @@ Keep one Next.js App Router application for the take-home. Separate concerns int
 - `src/repositories` — SQLite customer/order, support-session, agent-run, and admin read models.
 - `src/tools/agent` — strict LLM tool schemas, validation, authorization, tool implementations.
 - `src/services/agent` — model-independent orchestration, retry policy, prompt, loop guard.
-- `src/integrations/openai` — narrow Responses API adapter.
+- `src/integrations/openai` — narrow Responses API and voice-transport adapters.
 - `src/app/api` — HTTP/SSE transport over the same server-side services.
 - `src/app` / `src/components` — presentation only.
 
@@ -75,3 +75,20 @@ SQLite is sufficient for a self-contained take-home and keeps clone-to-run setup
 Phase 3 adds support-session/message persistence plus HTTP/SSE adapters. `/support` streams safe agent events and the final persisted assistant message. `/admin/runs` tails persisted events by sequence while a run is active. `/admin/refunds` reads only completed refund ledger rows.
 
 The transport layer never evaluates refund policy. It only validates request shape, resolves server-owned support context, invokes the existing agent/service layer, and serializes persisted results.
+
+
+## Phase 5 voice transport boundary
+
+Voice is deliberately split from reasoning. The browser opens a WebRTC session configured as `type: "transcription"`; no refund tools are registered with Realtime. The short-lived transcript then enters the same `/api/support/chat` endpoint as a typed message.
+
+```text
+mic -> Realtime transcription -> text -> existing support agent -> deterministic refund engine
+                                                       |
+                                                       v
+                                              persisted AGENT message
+                                                       |
+                                                       v
+                                                server-side TTS
+```
+
+The long-lived OpenAI API key remains server-only. The browser receives only a 60-second Realtime client secret. TTS accepts a support `sessionId` and persisted AGENT `messageId`, not arbitrary browser-provided text, so spoken output remains a rendering of the stored customer-facing response rather than a new model decision path.
