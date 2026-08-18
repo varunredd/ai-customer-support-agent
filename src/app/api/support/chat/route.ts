@@ -17,11 +17,21 @@ function sse(event: string, data: unknown) {
 }
 
 function publicError(error: unknown) {
-  const message = error instanceof Error ? error.message : "The support agent failed unexpectedly.";
   const code = error && typeof error === "object" && "code" in error && typeof error.code === "string"
     ? error.code
     : "SUPPORT_AGENT_FAILED";
-  return { code, message };
+
+  if (code === "OPENAI_API_KEY_MISSING") {
+    return { code: "SUPPORT_AGENT_NOT_CONFIGURED", message: "The support agent is not configured for live requests." };
+  }
+  if (code === "MAX_AGENT_TURNS_EXCEEDED") {
+    return { code, message: "The support agent could not finish this request safely. Please review the run and try again." };
+  }
+  if (code.startsWith("OPENAI_") || code === "OPERATION_TIMEOUT") {
+    return { code: "SUPPORT_AGENT_TEMPORARILY_UNAVAILABLE", message: "The support agent is temporarily unavailable. Please review the run before trying again." };
+  }
+
+  return { code: "SUPPORT_AGENT_FAILED", message: "The support agent could not complete this request. Please review the run before trying again." };
 }
 
 export async function POST(request: Request) {

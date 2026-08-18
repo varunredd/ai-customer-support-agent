@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Search } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -87,6 +88,7 @@ export default function RefundsLedgerPage() {
                     <th>Amount</th>
                     <th>Status</th>
                     <th>Processed</th>
+                    <th>Run</th>
                   </tr>
                 </thead>
                 {visible.length > 0 ? (
@@ -100,6 +102,13 @@ export default function RefundsLedgerPage() {
                         <td className="text-strong">{formatMoney(refund.amountCents)}</td>
                         <td><StatusBadge status="SUCCESS">COMPLETED</StatusBadge></td>
                         <td>{formatTime(refund.createdAt)}</td>
+                        <td>
+                          {refund.runId ? (
+                            <Link className="table-link" href={`/admin/runs?run=${encodeURIComponent(refund.runId)}`}>Inspect</Link>
+                          ) : (
+                            <span>Seeded</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

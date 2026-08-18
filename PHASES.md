@@ -54,19 +54,27 @@ Acceptance gate:
 - Refund ledger contains only executed money movement; denials remain auditable in runs.
 - No frontend refund decision logic exists.
 
-## Phase 4 — Product integration hardening
+## Phase 4 — Product integration hardening — COMPLETE
 
-Goal: finish the evaluated web product after the real APIs exist.
-
-Recommended delegation:
-- Antigravity: visual refinements and interaction polish only.
-- Cursor: client/server integration review, TypeScript/build/runtime bug pass.
-- Main engineering review: reject shortcuts that fabricate backend state or duplicate policy logic.
+Delivered:
+- Normal `/support` entry flow with CRM customer selection and customer-owned order selection.
+- Server-backed support-context API; customer/order lists come from SQLite rather than browser fixtures.
+- Existing deterministic `/demo` shortcuts retained for approve, deny, and guarded retry walkthroughs.
+- Demo scenario configuration isolated from the normal support product flow.
+- Customer-facing approval/denial/completed-refund presentation driven only by persisted agent events.
+- Safer support failure messages that do not surface provider/internal error details.
+- Polished session-start, loading, empty-order, working, failure, and new-session states.
+- Agent Runs URL selection, refresh/reconnect handling, outcome summaries, and live-state polish.
+- Refund ledger → Agent Run traceability.
+- Legacy hardcoded agent-run preview state removed.
+- Phase 4 integration tests for support context and backend-event outcome projection.
 
 Acceptance gate:
 - UI has zero hardcoded refund decisions.
+- `/support` is usable without `?scenario=` while `/demo` remains deterministic for evaluators.
 - Admin logs are persisted backend events, not fake frontend reasoning.
 - Loading, empty, error, retry, approval, and denial states are polished.
+- `npm run verify` passes on the local installed dependency set.
 
 ## Phase 5 — Voice bonus
 
