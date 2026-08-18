@@ -49,6 +49,7 @@ export interface PersistedAgentRun {
 export interface RunSupportAgentInput {
   message: string;
   customerEmail?: string;
+  orderId?: string;
   requestedAt?: string;
   runId?: string;
 }

@@ -1,15 +1,21 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { customers } from "@/data/customers";
-import { orders } from "@/data/orders";
+import { getDatabase } from "@/db/database";
+import { createSqliteCustomerRepository, createSqliteOrderRepository } from "@/repositories/sqlite";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { avatarColor, formatDate, formatMoney, getInitials } from "@/lib/format";
 import styles from "./page.module.css";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export default async function CustomerDetailPage({ params }: { params: Promise<{ customerId: string }> }) {
   const { customerId } = await params;
-  const customer = customers.find((item) => item.id === customerId);
+  const db = getDatabase();
+  const customerRepository = createSqliteCustomerRepository(db);
+  const orderRepository = createSqliteOrderRepository(db);
+  const customer = await customerRepository.findById(customerId);
 
   if (!customer) {
     return (
@@ -24,7 +30,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     );
   }
 
-  const customerOrders = orders.filter((order) => order.customerId === customerId);
+  const customerOrders = await orderRepository.listForCustomer(customerId);
 
   return (
     <div className="admin-page">

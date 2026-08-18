@@ -1,49 +1,120 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Button } from "@/components/ui/Button";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { formatMoney, formatTime } from "@/lib/format";
+
+interface RefundRow {
+  id: string;
+  runId: string | null;
+  customerId: string;
+  customerName: string;
+  orderId: string;
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  amountCents: number;
+  currency: "USD";
+  status: "COMPLETED";
+  createdAt: string;
+}
 
 export default function RefundsLedgerPage() {
+  const [refunds, setRefunds] = useState<RefundRow[]>([]);
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await fetch("/api/admin/refunds?limit=200", { cache: "no-store" });
+        if (!response.ok) throw new Error("Unable to load the refund ledger.");
+        const payload = (await response.json()) as { refunds: RefundRow[] };
+        setRefunds(payload.refunds);
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Unable to load refunds.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const visible = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return refunds;
+    return refunds.filter((refund) =>
+      [refund.id, refund.customerName, refund.customerId, refund.orderId, refund.itemName]
+        .some((value) => value.toLowerCase().includes(normalized)),
+    );
+  }, [query, refunds]);
+
   return (
     <div className="admin-page">
       <div className="admin-stack">
         <PageHeader
           title="Refunds Ledger"
-          description="Operations view of processed, pending, and denied refunds."
-        >
-          <Button variant="secondary" disabled>
-            Export
-          </Button>
-        </PageHeader>
+          description="Persisted money-movement records. Policy denials stay in Agent Runs and never create ledger rows."
+        />
 
         <div className="toolbar">
           <label className="search-field">
             <Search size={15} />
-            <input placeholder="Search refund ID, order, or customer" disabled />
+            <input
+              placeholder="Search refund ID, order, customer, or item"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
           </label>
-          <button className="filter-chip filter-chip-active">All</button>
-          <button className="filter-chip">Approved</button>
-          <button className="filter-chip">Denied</button>
-          <button className="filter-chip">Pending</button>
+          <button className="filter-chip filter-chip-active" type="button">Completed</button>
         </div>
 
         <div className="panel">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Refund</th>
-                <th>Customer</th>
-                <th>Order</th>
-                <th>Amount</th>
-                <th>Decision</th>
-                <th>Processed</th>
-              </tr>
-            </thead>
-          </table>
-          <EmptyState
-            title="No refunds processed yet"
-            description="Phase 2 now persists idempotent refund records; Phase 3 will connect this ledger to the live database."
-          />
+          {loading ? <LoadingState message="Loading persisted refunds…" /> : error ? <ErrorState description={error} /> : (
+            <>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Refund</th>
+                    <th>Customer</th>
+                    <th>Order</th>
+                    <th>Item</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Processed</th>
+                  </tr>
+                </thead>
+                {visible.length > 0 ? (
+                  <tbody>
+                    {visible.map((refund) => (
+                      <tr key={refund.id}>
+                        <td className="mono text-strong">{refund.id}</td>
+                        <td className="text-strong">{refund.customerName}</td>
+                        <td className="mono">{refund.orderId}</td>
+                        <td>{refund.itemName} · Qty {refund.quantity}</td>
+                        <td className="text-strong">{formatMoney(refund.amountCents)}</td>
+                        <td><StatusBadge status="SUCCESS">COMPLETED</StatusBadge></td>
+                        <td>{formatTime(refund.createdAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                ) : null}
+              </table>
+              {visible.length === 0 ? (
+                <EmptyState
+                  title={refunds.length === 0 ? "No refunds processed yet" : "No matching refunds"}
+                  description={refunds.length === 0
+                    ? "An approved live support request will appear here after atomic execution."
+                    : "Try a different refund ID, customer, order, or item."}
+                />
+              ) : null}
+            </>
+          )}
         </div>
       </div>
     </div>

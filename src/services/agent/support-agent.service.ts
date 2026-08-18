@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AppDatabase } from "@/db/database";
-import type { RunSupportAgentInput, RunSupportAgentResult } from "@/domain/agent/types";
+import type { PersistedAgentEvent, RunSupportAgentInput, RunSupportAgentResult } from "@/domain/agent/types";
 import { AgentRunRepository } from "@/repositories/agent-run.repository";
 import { AgentModelError, isFunctionCall, type AgentModel, type AgentModelResponse } from "@/services/agent/model";
 import { SUPPORT_AGENT_INSTRUCTIONS } from "@/services/agent/prompt";
@@ -15,6 +15,7 @@ export interface SupportAgentOptions extends Pick<CreateRefundToolRegistryOption
   toolTimeoutMs?: number;
   modelMaxAttempts?: number;
   modelTimeoutMs?: number;
+  onEvent?: (event: PersistedAgentEvent) => void | Promise<void>;
 }
 
 function positiveInteger(value: string | undefined, fallback: number) {
@@ -59,14 +60,16 @@ function isRetryableModelError(error: Error) {
 }
 
 function buildUserInput(input: RunSupportAgentInput, requestedAt: string) {
-  const context = input.customerEmail
-    ? `Authenticated customer email: ${input.customerEmail}\nRequest timestamp: ${requestedAt}`
-    : `Request timestamp: ${requestedAt}`;
-  return `${context}\n\nCustomer message:\n${input.message}`;
+  const contextLines = [
+    input.customerEmail ? `Authenticated customer email: ${input.customerEmail}` : null,
+    input.orderId ? `Active support order: ${input.orderId}` : null,
+    `Request timestamp: ${requestedAt}`,
+  ].filter((value): value is string => Boolean(value));
+  return `${contextLines.join("\n")}\n\nCustomer message:\n${input.message}`;
 }
 
-function maybeLogDeterministicEvents(
-  runRepository: AgentRunRepository,
+async function maybeLogDeterministicEvents(
+  appendEvent: (input: Parameters<AgentRunRepository["appendEvent"]>[0]) => Promise<PersistedAgentEvent>,
   runId: string,
   toolName: string,
   result: unknown,
@@ -74,7 +77,7 @@ function maybeLogDeterministicEvents(
   if (toolName === "validate_refund_request" && result && typeof result === "object" && !Array.isArray(result)) {
     const evaluation = result as Record<string, unknown>;
     const checks = Array.isArray(evaluation.checks) ? evaluation.checks : [];
-    runRepository.appendEvent({
+    await appendEvent({
       runId,
       type: "POLICY_CHECK",
       status: evaluation.decision === "APPROVE" ? "SUCCESS" : "FAILED",
@@ -82,7 +85,7 @@ function maybeLogDeterministicEvents(
       metadata: { checks },
     });
     if (evaluation.decision === "APPROVE" || evaluation.decision === "DENY") {
-      runRepository.appendEvent({
+      await appendEvent({
         runId,
         type: "DECISION",
         status: evaluation.decision === "APPROVE" ? "SUCCESS" : "FAILED",
@@ -98,7 +101,7 @@ function maybeLogDeterministicEvents(
 
   if (toolName === "execute_refund" && result && typeof result === "object" && !Array.isArray(result)) {
     const execution = result as Record<string, unknown>;
-    runRepository.appendEvent({
+    await appendEvent({
       runId,
       type: "REFUND_EXECUTION",
       status: execution.status === "COMPLETED" ? "SUCCESS" : "FAILED",
@@ -139,7 +142,17 @@ export async function runSupportAgent(
     inputText: userInput,
   });
 
-  runRepository.appendEvent({
+  if (input.orderId) {
+    runRepository.setContext(runId, { orderId: input.orderId });
+  }
+
+  const appendEvent = async (eventInput: Parameters<AgentRunRepository["appendEvent"]>[0]) => {
+    const event = runRepository.appendEvent(eventInput);
+    await options.onEvent?.(event);
+    return event;
+  };
+
+  await appendEvent({
     runId,
     type: "REQUEST_RECEIVED",
     status: "SUCCESS",
@@ -152,7 +165,7 @@ export async function runSupportAgent(
   try {
     for (let turn = 1; turn <= maxTurns; turn += 1) {
       const modelStarted = Date.now();
-      runRepository.appendEvent({
+      await appendEvent({
         runId,
         type: "MODEL_REQUEST",
         status: "RUNNING",
@@ -172,14 +185,14 @@ export async function runSupportAgent(
             timeoutMs: modelTimeoutMs,
             isRetryable: isRetryableModelError,
             onRetry: async ({ attempt, error, delayMs }) => {
-              runRepository.appendEvent({
+              await appendEvent({
                 runId,
                 type: "MODEL_FAILED",
                 status: "FAILED",
                 title: `Model attempt ${attempt} failed`,
                 metadata: { attempt, code: errorCode(error, "MODEL_ERROR"), message: error.message },
               });
-              runRepository.appendEvent({
+              await appendEvent({
                 runId,
                 type: "MODEL_RETRY",
                 status: "WARNING",
@@ -191,7 +204,7 @@ export async function runSupportAgent(
         );
       } catch (error) {
         const normalized = error instanceof Error ? error : new Error(String(error));
-        runRepository.appendEvent({
+        await appendEvent({
           runId,
           type: "MODEL_FAILED",
           status: "FAILED",
@@ -202,7 +215,7 @@ export async function runSupportAgent(
         throw normalized;
       }
 
-      runRepository.appendEvent({
+      await appendEvent({
         runId,
         type: "MODEL_RESPONSE",
         status: "SUCCESS",
@@ -218,7 +231,7 @@ export async function runSupportAgent(
           throw new AgentModelError("MODEL_EMPTY_RESPONSE", "Model returned neither tool calls nor customer-facing text.", false);
         }
         runRepository.complete(runId, finalText);
-        runRepository.appendEvent({
+        await appendEvent({
           runId,
           type: "RUN_COMPLETED",
           status: "SUCCESS",
@@ -247,7 +260,7 @@ export async function runSupportAgent(
               retryable: false,
             },
           };
-          runRepository.appendEvent({
+          await appendEvent({
             runId,
             type: "TOOL_FAILED",
             status: "FAILED",
@@ -265,7 +278,7 @@ export async function runSupportAgent(
           continue;
         }
 
-        runRepository.appendEvent({
+        await appendEvent({
           runId,
           type: "TOOL_STARTED",
           status: "RUNNING",
@@ -290,7 +303,7 @@ export async function runSupportAgent(
                 timeoutMs: toolTimeoutMs,
                 isRetryable: isRetryableToolError,
                 onRetry: async ({ attempt, error, delayMs }) => {
-                  runRepository.appendEvent({
+                  await appendEvent({
                     runId,
                     type: "TOOL_FAILED",
                     status: "FAILED",
@@ -303,7 +316,7 @@ export async function runSupportAgent(
                       message: error.message,
                     },
                   });
-                  runRepository.appendEvent({
+                  await appendEvent({
                     runId,
                     type: "TOOL_RETRY",
                     status: "WARNING",
@@ -325,7 +338,7 @@ export async function runSupportAgent(
           }
         }
 
-        runRepository.appendEvent({
+        await appendEvent({
           runId,
           type: toolResult.ok ? "TOOL_SUCCEEDED" : "TOOL_FAILED",
           status: toolResult.ok ? "SUCCESS" : "FAILED",
@@ -337,7 +350,7 @@ export async function runSupportAgent(
         });
 
         if (toolResult.ok) {
-          maybeLogDeterministicEvents(runRepository, runId, toolCall.name, toolResult.result);
+          await maybeLogDeterministicEvents(appendEvent, runId, toolCall.name, toolResult.result);
         }
 
         conversationInput.push({
@@ -353,7 +366,7 @@ export async function runSupportAgent(
     const normalized = error instanceof Error ? error : new Error(String(error));
     const code = error instanceof AgentModelError ? error.code : "AGENT_RUN_FAILED";
     runRepository.fail(runId, code, normalized.message);
-    runRepository.appendEvent({
+    await appendEvent({
       runId,
       type: "RUN_FAILED",
       status: "FAILED",

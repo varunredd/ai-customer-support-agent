@@ -96,6 +96,10 @@ export function createSqliteCustomerRepository(db: AppDatabase): CustomerReposit
         | undefined;
       return row ? mapCustomer(row) : null;
     },
+    async listAll() {
+      const rows = db.prepare("SELECT * FROM customers ORDER BY name").all() as CustomerRow[];
+      return rows.map(mapCustomer);
+    },
   };
 }
 
@@ -110,6 +114,12 @@ export function createSqliteOrderRepository(db: AppDatabase): OrderRepository {
         .prepare("SELECT * FROM orders WHERE id = ? AND customer_id = ?")
         .get(orderId, customerId) as OrderRow | undefined;
       return row ? mapOrder(db, row) : null;
+    },
+    async listForCustomer(customerId) {
+      const rows = db
+        .prepare("SELECT * FROM orders WHERE customer_id = ? ORDER BY placed_at DESC")
+        .all(customerId) as OrderRow[];
+      return rows.map((row) => mapOrder(db, row));
     },
   };
 }
