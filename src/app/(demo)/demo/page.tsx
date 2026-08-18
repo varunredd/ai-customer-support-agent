@@ -1,6 +1,28 @@
 import Link from "next/link";
+import { ArrowRight, CheckCircle2, RotateCcw, ShieldX } from "lucide-react";
+import { DEMO_SCENARIOS } from "@/config/demo-scenarios";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/Button";
+
+const DEMO_CARDS = [
+  {
+    scenario: DEMO_SCENARIOS.approve,
+    description: "Maya Patel requests a refund for Studio Headphones. The deterministic policy allows the request.",
+    icon: <CheckCircle2 size={18} />,
+    button: "Open approval demo",
+  },
+  {
+    scenario: DEMO_SCENARIOS.deny,
+    description: "Noah Williams requests a refund for a final-sale item. The policy engine blocks the refund.",
+    icon: <ShieldX size={18} />,
+    button: "Open denial demo",
+  },
+  {
+    scenario: DEMO_SCENARIOS.retry,
+    description: "Inject one guarded order-lookup failure so the persisted run shows failure → retry → success.",
+    icon: <RotateCcw size={18} />,
+    button: "Open retry demo",
+  },
+] as const;
 
 export default function DemoControlPage() {
   return (
@@ -8,37 +30,39 @@ export default function DemoControlPage() {
       <div className="admin-stack">
         <PageHeader
           title="Demo Control"
-          description="Preset walkthrough scenarios for the hiring evaluation."
-        />
+          description="Deterministic evaluator shortcuts. The normal product flow remains available at /support without query parameters."
+        >
+          <Link href="/support" className="primary-link">
+            Normal support flow <ArrowRight size={14} />
+          </Link>
+        </PageHeader>
 
         <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-          <article className="panel panel-body">
-            <h2 className="panel-title">Standard approval</h2>
-            <p className="panel-subtitle" style={{ margin: "8px 0 16px" }}>
-              Maya Patel requests a refund for Studio Headphones. All policy checks pass.
-            </p>
-            <Link href="/support?scenario=approve">
-              <Button>Open chat</Button>
-            </Link>
-          </article>
-          <article className="panel panel-body">
-            <h2 className="panel-title">Policy denial</h2>
-            <p className="panel-subtitle" style={{ margin: "8px 0 16px" }}>
-              Noah Williams requests a refund for a final-sale item. Engine denies RF-002.
-            </p>
-            <Link href="/support?scenario=deny">
-              <Button variant="secondary">Open denial chat</Button>
-            </Link>
-          </article>
-          <article className="panel panel-body">
-            <h2 className="panel-title">Failure / retry</h2>
-            <p className="panel-subtitle" style={{ margin: "8px 0 16px" }}>
-              Simulate a tool failure and retry path during agent execution.
-            </p>
-            <Link href="/support?scenario=retry">
-              <Button variant="secondary">Open retry chat</Button>
-            </Link>
-          </article>
+          {DEMO_CARDS.map(({ scenario, description, icon, button }, index) => (
+            <article key={scenario.key} className="panel panel-body">
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {icon}
+                <h2 className="panel-title">{scenario.label}</h2>
+              </div>
+              <p className="panel-subtitle" style={{ margin: "8px 0 8px" }}>{description}</p>
+              <p className="panel-subtitle" style={{ margin: "0 0 16px" }}>
+                Expected: <strong>{scenario.expectedOutcome}</strong>
+              </p>
+              <Link
+                href={`/support?scenario=${scenario.key}`}
+                className={index === 0 ? "primary-link" : "table-link"}
+              >
+                {button}
+              </Link>
+            </article>
+          ))}
+        </div>
+
+        <div className="panel panel-body">
+          <h2 className="panel-title">Retry demo configuration</h2>
+          <p className="panel-subtitle" style={{ marginTop: 8 }}>
+            The retry scenario only injects a failure when <code>ENABLE_DEMO_FAILURES=true</code>. It is disabled by default so normal support traffic cannot trigger synthetic failures.
+          </p>
         </div>
       </div>
     </div>

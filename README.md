@@ -4,7 +4,7 @@ A policy-grounded e-commerce support agent built for the Jobform Automator Next.
 
 The application deliberately separates **conversation/orchestration** from **money decisions**: the LLM can decide which tool to call, but only deterministic server-side code can approve, deny, calculate, or persist a refund.
 
-## Current status — Phase 3
+## Current status — Phase 4 integration hardening
 
 Implemented:
 
@@ -24,8 +24,12 @@ Implemented:
 - Exact idempotent replay from the persisted original refund evaluation.
 - Structured observability only; hidden chain-of-thought is never persisted or displayed.
 - Tests for approval, denial, execution bypass attempts, identity switching, idempotency, partial refunds, retries, malformed calls, and loop guards.
+- Normal `/support` session setup backed by persisted CRM customers and customer-owned orders.
+- Deterministic `/demo` shortcuts retained separately for evaluator approval/denial/retry walkthroughs.
+- Customer-visible refund outcome cards projected only from persisted decision/execution events.
+- Agent Runs deep links, stream reconnect polish, and Refund Ledger → Agent Run traceability.
 
-The main evaluated vertical slice is now live: `/support` persists sessions/messages and streams structured agent activity, while `/admin`, `/admin/runs`, `/admin/customers`, and `/admin/refunds` read persisted backend state. The policy screen remains a read-only view of the authoritative machine-checkable policy in code.
+The evaluated vertical slice is live and product-hardened: `/support` works as a normal customer/order-selected flow with no query parameter, while `/demo` retains deterministic evaluator shortcuts. Chat persists sessions/messages and streams structured agent activity; `/admin`, `/admin/runs`, `/admin/customers`, and `/admin/refunds` read persisted backend state. The policy screen remains a read-only view of the authoritative machine-checkable policy in code.
 
 ## Architecture
 
@@ -170,20 +174,22 @@ npm run verify
 
 The `.data` directory, SQLite files, `.env*` secrets, build output, and `node_modules` are excluded from source exports.
 
-## Phase 3 web demo
+## Web product and deterministic demo
 
 After `npm run db:reset` and `npm run dev`:
 
-- `/support?scenario=approve` — live approval flow.
-- `/support?scenario=deny` — live final-sale denial flow.
+- `/support` — normal flow: choose a CRM customer, choose one of that customer's orders, then start live support.
+- `/demo` — deterministic evaluator launcher.
+- `/support?scenario=approve` — live approval shortcut.
+- `/support?scenario=deny` — live final-sale denial shortcut.
+- `/support?scenario=retry` — guarded failure/retry shortcut.
 - `/admin/runs` — persisted/live structured agent timeline.
-- `/admin/refunds` — persisted money-movement ledger.
-- `/demo` — links to approval, denial, and retry walkthroughs.
+- `/admin/refunds` — persisted money-movement ledger with links back to runtime agent runs.
 
-For the local failure/retry walkthrough, set `ENABLE_DEMO_FAILURES=true` in `.env.local` before opening `/support?scenario=retry`.
+For the local failure/retry walkthrough, set `ENABLE_DEMO_FAILURES=true` in `.env.local` before opening `/support?scenario=retry`. Failure injection is disabled by default.
 
-## Next — Phase 4
+## Next — Phase 5
 
-Phase 4 hardens the integrated product: integration review, UX edge states, public-demo safety boundaries, and final bug fixing before the optional voice phase.
+Phase 5 is the optional voice bonus. It must reuse the same server-side tool and deterministic refund boundaries; voice cannot become a second refund implementation.
 
-See `docs/architecture.md`, `docs/phase-2.md`, `docs/phase-3.md`, and `PHASES.md` for implementation details and phase boundaries.
+See `docs/architecture.md`, `docs/phase-2.md`, `docs/phase-3.md`, `docs/phase-4.md`, and `PHASES.md` for implementation details and phase boundaries.

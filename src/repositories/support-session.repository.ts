@@ -105,7 +105,7 @@ export class SupportSessionRepository {
 
   listMessages(sessionId: string): SupportMessage[] {
     const rows = this.db
-      .prepare("SELECT * FROM support_messages WHERE session_id = ? ORDER BY created_at, id")
+      .prepare("SELECT * FROM support_messages WHERE session_id = ? ORDER BY created_at, rowid")
       .all(sessionId) as SupportMessageRow[];
     return rows.map(mapMessage);
   }

@@ -1,0 +1,77 @@
+.card {
+  width: min(680px, 100%);
+  align-self: center;
+  display: flex;
+  gap: 12px;
+  padding: 15px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.approved {
+  border-color: rgba(15, 118, 110, 0.22);
+  background: linear-gradient(135deg, rgba(236, 253, 245, 0.95), rgba(255, 255, 255, 0.96));
+}
+
+.denied {
+  border-color: rgba(185, 28, 28, 0.18);
+  background: linear-gradient(135deg, rgba(254, 242, 242, 0.96), rgba(255, 255, 255, 0.96));
+}
+
+.icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.approved .icon { color: var(--ok); }
+.denied .icon { color: var(--error); }
+
+.content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kicker {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.titleRow h3 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.titleRow strong {
+  color: var(--ok);
+  font-size: 1.1rem;
+}
+
+.content p {
+  margin: 0;
+  color: var(--muted-strong);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.reference {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}

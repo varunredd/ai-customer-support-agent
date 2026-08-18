@@ -53,6 +53,9 @@
 .list {
   flex: 1;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .runItem {
@@ -142,15 +145,92 @@
 
 .emptyState {
   display: flex;
+  flex: 1;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  min-height: 0;
+  padding: 28px 24px;
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-align: center;
 }
 
 @media (max-width: 980px) {
   .split {
     grid-template-columns: 1fr;
   }
+}
+
+.refreshButton,
+.inlineRetry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: rgba(255, 252, 248, 0.8);
+  color: var(--muted-strong);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.refreshButton:hover,
+.inlineRetry:hover {
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+.inlineRetry {
+  margin: 0 auto 24px;
+}
+
+.errorBar {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(185, 28, 28, 0.18);
+  background: var(--error-bg);
+  color: var(--error);
+  font-size: 0.86rem;
+}
+
+.runOutcome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 2px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--muted-strong);
+}
+
+.detailOutcome {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.detailOutcome strong {
+  color: var(--ok);
+  font-size: 0.95rem;
+}
+
+.statusStack {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.liveState {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 650;
 }
