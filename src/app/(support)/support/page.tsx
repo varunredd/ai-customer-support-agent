@@ -15,6 +15,7 @@ import { RefundOutcomeCard } from "@/components/chat/RefundOutcomeCard";
 import { SupportSessionSetup } from "@/components/chat/SupportSessionSetup";
 import { SupportSetupPanel } from "@/components/chat/SupportSetupPanel";
 import type { SupportCustomerOption, SupportOrderOption } from "@/domain/support/context";
+import { useRealtimeTranscription } from "@/hooks/useRealtimeTranscription";
 import { readSseResponse } from "@/lib/sse-client";
 import { supportOutcomeFromEvent, type SupportOutcome } from "@/lib/support-outcome";
 import styles from "./page.module.css";
@@ -45,6 +46,8 @@ async function readResponseError(response: Response, fallback: string) {
 export default function SupportPage() {
   const router = useRouter();
   const bootstrapped = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
   const [detail, setDetail] = useState<SupportSessionDetail | null>(null);
   const [scenario, setScenario] = useState<DemoScenarioName | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
@@ -56,6 +59,69 @@ export default function SupportPage() {
   const [error, setError] = useState<string | null>(null);
   const [setupCustomer, setSetupCustomer] = useState<SupportCustomerOption | null>(null);
   const [setupOrder, setSetupOrder] = useState<SupportOrderOption | null>(null);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [voicePlaybackError, setVoicePlaybackError] = useState<string | null>(null);
+
+  const stopPlayback = useCallback(() => {
+    const audio = audioRef.current;
+    audioRef.current = null;
+    if (audio) {
+      audio.onended = null;
+      audio.onerror = null;
+      audio.pause();
+    }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+    if (audio) audio.removeAttribute("src");
+    setSpeakingMessageId(null);
+  }, []);
+
+  useEffect(() => stopPlayback, [stopPlayback]);
+
+  const playAgentMessage = useCallback(async (message: SupportMessage) => {
+    if (message.role !== "AGENT") return;
+    stopPlayback();
+    setVoicePlaybackError(null);
+    setSpeakingMessageId(message.id);
+
+    try {
+      const response = await fetch("/api/voice/speech", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: message.sessionId, messageId: message.id }),
+      });
+      if (!response.ok) {
+        throw new Error(await readResponseError(response, "Voice playback is temporarily unavailable."));
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audioUrlRef.current = url;
+      audio.onended = () => stopPlayback();
+      audio.onerror = () => {
+        // Clearing src after a successful play also fires error; ignore that cleanup.
+        if (!audioRef.current || audio.ended || audio.currentTime > 0) {
+          stopPlayback();
+          return;
+        }
+        setVoicePlaybackError("The AI-generated voice could not be played. The text response remains available.");
+        stopPlayback();
+      };
+      await audio.play();
+    } catch (caught) {
+      stopPlayback();
+      const messageText = caught instanceof Error ? caught.message : "Voice playback is temporarily unavailable.";
+      if (messageText.toLowerCase().includes("play()") || messageText.toLowerCase().includes("autoplay")) {
+        setVoicePlaybackError("Your browser blocked automatic audio playback. Use Listen on the agent message to play the AI-generated voice.");
+      } else {
+        setVoicePlaybackError(messageText);
+      }
+    }
+  }, [stopPlayback]);
 
   const initializeSession = useCallback(async (input: { customerId: string; orderId: string }) => {
     setIsStarting(true);
@@ -116,21 +182,10 @@ export default function SupportPage() {
     setSetupOrder(selection.order);
   }, []);
 
-  const handleNewSession = () => {
-    setDetail(null);
-    setScenario(null);
-    setMessages([]);
-    setActivity(null);
-    setOutcome(null);
-    setCurrentRunId(null);
-    setError(null);
-    setSetupCustomer(null);
-    setSetupOrder(null);
-    router.replace("/support", { scroll: false });
-  };
-
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, options?: { speakResponse?: boolean }) => {
     if (!detail || isSending) return;
+    stopPlayback();
+    setVoicePlaybackError(null);
     const optimistic: SupportMessage = {
       id: `local_${Date.now()}`,
       sessionId: detail.session.id,
@@ -144,6 +199,7 @@ export default function SupportPage() {
     setError(null);
     setOutcome(null);
     setActivity("Sending request to the support agent…");
+    let assistantMessageForVoice: SupportMessage | null = null;
 
     try {
       const demoFailure = scenario ? DEMO_SCENARIOS[scenario].demoFailure : false;
@@ -175,7 +231,9 @@ export default function SupportPage() {
           if (nextOutcome) setOutcome(nextOutcome);
         }
         if (event === "assistant_message" && data && typeof data === "object" && !Array.isArray(data)) {
-          setMessages((previous) => [...previous, data as SupportMessage]);
+          const assistantMessage = data as SupportMessage;
+          assistantMessageForVoice = assistantMessage;
+          setMessages((previous) => [...previous, assistantMessage]);
         }
         if (event === "error" && data && typeof data === "object" && !Array.isArray(data)) {
           const message = (data as { message?: unknown }).message;
@@ -185,6 +243,9 @@ export default function SupportPage() {
 
       await refreshSession(detail.session.id);
       setActivity(null);
+      if (options?.speakResponse && assistantMessageForVoice) {
+        await playAgentMessage(assistantMessageForVoice);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The support request failed.");
       setActivity(null);
@@ -194,11 +255,43 @@ export default function SupportPage() {
     }
   };
 
+  const voice = useRealtimeTranscription({
+    sessionId: detail?.session.id ?? null,
+    disabled: isSending || !detail,
+    onFinalTranscript: async (transcript) => {
+      await handleSend(transcript, { speakResponse: true });
+    },
+  });
+
+  const handleNewSession = () => {
+    voice.stop();
+    stopPlayback();
+    setDetail(null);
+    setScenario(null);
+    setMessages([]);
+    setActivity(null);
+    setOutcome(null);
+    setCurrentRunId(null);
+    setError(null);
+    setVoicePlaybackError(null);
+    setSetupCustomer(null);
+    setSetupOrder(null);
+    router.replace("/support", { scroll: false });
+  };
+
   const sessionSubtitle = detail
     ? `${scenario ? `${DEMO_SCENARIOS[scenario].label} demo · ` : ""}${detail.customer.name} · Order ${detail.order.id}`
     : scenario && isStarting
       ? `Preparing ${DEMO_SCENARIOS[scenario].label.toLowerCase()} demo…`
       : "Choose a CRM customer and owned order to begin.";
+
+  const supportStatus = voice.isActive
+    ? voice.state === "CONNECTING" ? "Voice connecting" : "Listening"
+    : isSending
+      ? "Working"
+      : isStarting
+        ? "Starting"
+        : "Ready";
 
   return (
     <div className={styles.layout}>
@@ -209,14 +302,14 @@ export default function SupportPage() {
               <h1 className={styles.title}>Customer Support</h1>
               <div className={styles.status}>
                 <span className={styles.statusDot} />
-                <span className={styles.statusText}>{isSending ? "Working" : isStarting ? "Starting" : "Ready"}</span>
+                <span className={styles.statusText}>{supportStatus}</span>
               </div>
             </div>
             <p className={styles.session}>{sessionSubtitle}</p>
           </div>
           <div className={styles.headerActions}>
             {detail ? (
-              <button type="button" className={styles.newSessionButton} onClick={handleNewSession} disabled={isSending}>
+              <button type="button" className={styles.newSessionButton} onClick={handleNewSession} disabled={isSending || voice.isActive}>
                 <RotateCcw size={14} /> New session
               </button>
             ) : null}
@@ -236,6 +329,8 @@ export default function SupportPage() {
                   role={message.role === "AGENT" ? "agent" : "customer"}
                   content={message.content}
                   timestamp={formatMessageTime(message.createdAt)}
+                  onSpeak={message.role === "AGENT" && !message.id.startsWith("local_") ? () => void playAgentMessage(message) : undefined}
+                  speaking={speakingMessageId === message.id}
                 />
               ))}
               {activity ? <AgentActivityLog activity={activity} /> : null}
@@ -267,8 +362,15 @@ export default function SupportPage() {
                 onSend={handleSend}
                 disabled={isSending}
                 placeholder={isSending ? "Agent is working…" : "Ask about your refund…"}
+                voiceState={voice.state}
+                voicePreview={voice.partialTranscript}
+                voiceError={voice.error}
+                onVoiceToggle={voice.toggle}
               />
-              <p className={styles.hint}>AI-assisted support · refund decisions are enforced by server-side policy.</p>
+              {voicePlaybackError ? <p className={styles.voicePlaybackError} role="status">{voicePlaybackError}</p> : null}
+              <p className={styles.hint}>
+                Voice responses are AI-generated. Microphone turns are transcribed with OpenAI Realtime, then sent through the same server-side refund agent and deterministic policy as typed messages.
+              </p>
             </div>
           </div>
         ) : null}

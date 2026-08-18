@@ -103,6 +103,13 @@ export class SupportSessionRepository {
     this.db.prepare("UPDATE support_messages SET run_id = ? WHERE id = ? AND run_id IS NULL").run(runId, messageId);
   }
 
+  findMessageById(messageId: string): SupportMessage | null {
+    const row = this.db.prepare("SELECT * FROM support_messages WHERE id = ?").get(messageId) as
+      | SupportMessageRow
+      | undefined;
+    return row ? mapMessage(row) : null;
+  }
+
   listMessages(sessionId: string): SupportMessage[] {
     const rows = this.db
       .prepare("SELECT * FROM support_messages WHERE session_id = ? ORDER BY created_at, rowid")

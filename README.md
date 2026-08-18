@@ -4,7 +4,7 @@ A policy-grounded e-commerce support agent built for the Jobform Automator Next.
 
 The application deliberately separates **conversation/orchestration** from **money decisions**: the LLM can decide which tool to call, but only deterministic server-side code can approve, deny, calculate, or persist a refund.
 
-## Current status — Phase 4 integration hardening
+## Current status — Phase 5 voice bonus
 
 Implemented:
 
@@ -28,15 +28,21 @@ Implemented:
 - Deterministic `/demo` shortcuts retained separately for evaluator approval/denial/retry walkthroughs.
 - Customer-visible refund outcome cards projected only from persisted decision/execution events.
 - Agent Runs deep links, stream reconnect polish, and Refund Ledger → Agent Run traceability.
+- OpenAI Realtime WebRTC microphone transcription using short-lived browser credentials.
+- Voice transcripts submitted through the exact same `/api/support/chat` agent and deterministic refund path as typed messages.
+- OpenAI TTS playback generated only from persisted AGENT messages; no client-controlled arbitrary TTS text.
+- Typed chat remains the fallback whenever microphone, Realtime, playback, or browser permissions fail.
 
-The evaluated vertical slice is live and product-hardened: `/support` works as a normal customer/order-selected flow with no query parameter, while `/demo` retains deterministic evaluator shortcuts. Chat persists sessions/messages and streams structured agent activity; `/admin`, `/admin/runs`, `/admin/customers`, and `/admin/refunds` read persisted backend state. The policy screen remains a read-only view of the authoritative machine-checkable policy in code.
+The evaluated vertical slice is live and product-hardened: `/support` works as a normal customer/order-selected flow with no query parameter, while `/demo` retains deterministic evaluator shortcuts. Chat persists sessions/messages and streams structured agent activity; `/admin`, `/admin/runs`, `/admin/customers`, and `/admin/refunds` read persisted backend state. Phase 5 adds optional voice as a transport around that same path: Realtime performs transcription only, the existing support agent still owns orchestration, and deterministic code still owns refund decisions.
 
 ## Architecture
 
 ```text
-Customer message
-      |
-      v
+Typed message --------------------+
+                               |
+Microphone -> Realtime STT ----+
+                               |
+                               v
 Support Agent Orchestrator  -----> OpenAI Responses API
       |                               |
       |<------ function calls --------|
@@ -165,8 +171,11 @@ npm run verify
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | Server-only OpenAI credential | required for live agent |
+| `OPENAI_API_KEY` | Server-only OpenAI credential | required for live agent + voice |
 | `OPENAI_MODEL` | Responses API model | `gpt-4o-mini` |
+| `OPENAI_TRANSCRIBE_MODEL` | Realtime microphone transcription | `gpt-live-transcribe` |
+| `OPENAI_TTS_MODEL` | Spoken assistant response model | `gpt-4o-mini-tts` |
+| `OPENAI_TTS_VOICE` | AI-generated support voice | `marin` |
 | `DATABASE_PATH` | Local SQLite file | `.data/jobform-support.sqlite` |
 | `AGENT_MAX_TURNS` | Model-loop safety bound | `10` |
 | `AGENT_TOOL_MAX_ATTEMPTS` | Automatic tool attempts | `3` |
@@ -188,8 +197,14 @@ After `npm run db:reset` and `npm run dev`:
 
 For the local failure/retry walkthrough, set `ENABLE_DEMO_FAILURES=true` in `.env.local` before opening `/support?scenario=retry`. Failure injection is disabled by default.
 
-## Next — Phase 5
+## Voice bonus
 
-Phase 5 is the optional voice bonus. It must reuse the same server-side tool and deterministic refund boundaries; voice cannot become a second refund implementation.
+After a support session starts, the microphone button creates one Realtime WebRTC transcription turn. The final transcript is sent into the same chat endpoint used by typed input. For voice-originated turns the persisted AGENT response is also synthesized and played; every agent message has a **Listen** replay control.
 
-See `docs/architecture.md`, `docs/phase-2.md`, `docs/phase-3.md`, `docs/phase-4.md`, and `PHASES.md` for implementation details and phase boundaries.
+Spoken responses are AI-generated. No Realtime refund tools exist, and a voice turn cannot bypass the deterministic refund engine. If voice fails, typed chat remains available.
+
+## Next — Phase 6
+
+Phase 6 performs final regression, deployment/GitHub hygiene, demo reset, README cleanup, and the 7–10 minute submission walkthrough.
+
+See `docs/architecture.md`, `docs/phase-2.md`, `docs/phase-3.md`, `docs/phase-4.md`, `docs/phase-5.md`, and `PHASES.md` for implementation details and phase boundaries.

@@ -86,3 +86,36 @@
   color: white;
   border-top-right-radius: 6px;
 }
+
+.speakButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 650;
+  padding: 2px 4px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.speakButton:hover:not(:disabled) {
+  background: rgba(79, 70, 229, 0.07);
+  color: var(--accent);
+}
+
+.speakButton:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.spin {
+  animation: messageSpin 0.9s linear infinite;
+}
+
+@keyframes messageSpin {
+  to { transform: rotate(360deg); }
+}
