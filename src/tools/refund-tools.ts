@@ -1,13 +1,17 @@
 import { REFUND_POLICY } from "@/domain/refunds/policy";
+import type { ExecuteRefundInput } from "@/domain/refunds/execution";
 import type { RefundRequest } from "@/domain/refunds/types";
-import { customerRepository, orderRepository } from "@/repositories/in-memory";
+import { getApplicationRepositories } from "@/repositories";
 import { evaluateRefundEligibility } from "@/services/refund-eligibility.service";
+import { executeRefundAtomically } from "@/services/refund-execution.service";
 
 export async function lookupCustomerByEmail(email: string) {
+  const { customerRepository } = getApplicationRepositories();
   return customerRepository.findByEmail(email);
 }
 
 export async function lookupOrder(orderId: string, customerId: string) {
+  const { orderRepository } = getApplicationRepositories();
   return orderRepository.findForCustomer(orderId, customerId);
 }
 
@@ -16,6 +20,7 @@ export async function getRefundPolicy() {
 }
 
 export async function validateRefundRequest(request: RefundRequest) {
+  const { db, customerRepository, orderRepository } = getApplicationRepositories();
   const customer = await customerRepository.findById(request.customerId);
   const order = await orderRepository.findById(request.orderId);
 
@@ -26,5 +31,16 @@ export async function validateRefundRequest(request: RefundRequest) {
     return { decision: "DENY" as const, refundAmountCents: 0, checks: [], denialReasons: ["ORDER_NOT_FOUND: Order does not exist."] };
   }
 
-  return evaluateRefundEligibility(customer, order, request);
+  const refunded = db
+    .prepare("SELECT COALESCE(SUM(quantity), 0) AS quantity FROM refunds WHERE item_id = ?")
+    .get(request.itemId) as { quantity: number };
+
+  return evaluateRefundEligibility(customer, order, request, {
+    alreadyRefundedItemQuantity: refunded.quantity,
+  });
+}
+
+export async function executeRefund(input: ExecuteRefundInput) {
+  const { db } = getApplicationRepositories();
+  return executeRefundAtomically(db, input);
 }

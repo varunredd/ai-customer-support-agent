@@ -1,0 +1,37 @@
+import type { RefundEvaluation, RefundRequest } from "@/domain/refunds/types";
+
+export interface ExecuteRefundInput {
+  idempotencyKey: string;
+  runId?: string;
+  request: RefundRequest;
+}
+
+export interface RefundRecord {
+  id: string;
+  idempotencyKey: string;
+  runId: string | null;
+  customerId: string;
+  orderId: string;
+  itemId: string;
+  quantity: number;
+  reason: RefundRequest["reason"];
+  condition: RefundRequest["condition"];
+  amountCents: number;
+  currency: "USD";
+  status: "COMPLETED";
+  createdAt: string;
+}
+
+export type ExecuteRefundResult =
+  | {
+      status: "COMPLETED";
+      idempotentReplay: boolean;
+      refund: RefundRecord;
+      evaluation: RefundEvaluation;
+    }
+  | {
+      status: "DENIED";
+      idempotentReplay: false;
+      refund: null;
+      evaluation: RefundEvaluation;
+    };

@@ -31,7 +31,7 @@ export default function SupportPage() {
         ...prev,
         {
           role: "agent",
-          content: "I'm still a demo shell right now, but in Phase 2 I'll look up this order and run the refund policy engine for you.",
+          content: "The Phase 2 agent backend is ready. Phase 3 will connect this chat to the live tool-calling workflow.",
           timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
         },
       ]);

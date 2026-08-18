@@ -35,7 +35,7 @@ export default function DemoControlPage() {
             <p className="panel-subtitle" style={{ margin: "8px 0 16px" }}>
               Simulate a tool failure and retry path during agent execution.
             </p>
-            <Button variant="secondary" disabled>Available in Phase 2</Button>
+            <Button variant="secondary" disabled>Backend ready · UI wiring in Phase 3</Button>
           </article>
         </div>
       </div>

@@ -16,15 +16,22 @@ function conditionIsAllowed(request: RefundRequest): boolean {
   return false;
 }
 
+export interface RefundEvaluationContext {
+  alreadyRefundedItemQuantity?: number;
+}
+
 export function evaluateRefundEligibility(
   customer: Customer,
   order: Order,
   request: RefundRequest,
+  context: RefundEvaluationContext = {},
 ): RefundEvaluation {
   const item = order.items.find((candidate) => candidate.id === request.itemId);
   const daysSinceDelivery = order.deliveredAt
     ? differenceInCalendarDays(request.requestedAt, order.deliveredAt)
     : null;
+  const alreadyRefundedItemQuantity = Math.max(0, context.alreadyRefundedItemQuantity ?? 0);
+  const remainingItemQuantity = item ? Math.max(0, item.quantity - alreadyRefundedItemQuantity) : 0;
   const itemRefundCents = item ? item.unitPriceCents * request.quantity : 0;
   const remainingOrderBalanceCents = Math.max(0, order.totalPaidCents - order.refundedCents);
 
@@ -36,7 +43,7 @@ export function evaluateRefundEligibility(
     check("WITHIN_WINDOW", daysSinceDelivery !== null && daysSinceDelivery >= 0 && daysSinceDelivery <= REFUND_POLICY.refundWindowDays, `Request must be within ${REFUND_POLICY.refundWindowDays} days of delivery.`, { daysSinceDelivery, allowedDays: REFUND_POLICY.refundWindowDays }),
     check("ITEM_REFUNDABLE", Boolean(item?.refundable), "Item must be explicitly refundable.", { itemFound: Boolean(item), refundable: item?.refundable ?? false }),
     check("NOT_FINAL_SALE", item !== undefined && item.finalSale === false, "Final-sale items cannot be refunded.", { finalSale: item?.finalSale ?? null }),
-    check("VALID_QUANTITY", item !== undefined && Number.isInteger(request.quantity) && request.quantity >= 1 && request.quantity <= item.quantity, "Refund quantity must be within the purchased quantity.", { requestedQuantity: request.quantity, purchasedQuantity: item?.quantity ?? 0 }),
+    check("VALID_QUANTITY", item !== undefined && Number.isInteger(request.quantity) && request.quantity >= 1 && request.quantity <= remainingItemQuantity, "Refund quantity must not exceed the remaining unrefunded purchased quantity.", { requestedQuantity: request.quantity, purchasedQuantity: item?.quantity ?? 0, alreadyRefundedItemQuantity, remainingItemQuantity }),
     check("CONDITION_ALLOWED", conditionIsAllowed(request), "Item condition must satisfy the rule for the selected refund reason.", { reason: request.reason, condition: request.condition }),
     check("REMAINING_BALANCE", itemRefundCents > 0 && itemRefundCents <= remainingOrderBalanceCents, "Refund cannot exceed the remaining paid balance.", { requestedRefundCents: itemRefundCents, remainingOrderBalanceCents }),
   ];

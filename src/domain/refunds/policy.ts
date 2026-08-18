@@ -15,7 +15,7 @@ export const REFUND_POLICY = {
     { code: "WITHIN_WINDOW", title: "30-day window", text: "A refund request must be submitted within 30 calendar days of delivery." },
     { code: "ITEM_REFUNDABLE", title: "Refundable item", text: "Items explicitly marked non-refundable are never eligible." },
     { code: "NOT_FINAL_SALE", title: "No final-sale refunds", text: "Final-sale merchandise cannot be refunded." },
-    { code: "VALID_QUANTITY", title: "Valid quantity", text: "The requested refund quantity must be at least one and cannot exceed the purchased quantity." },
+    { code: "VALID_QUANTITY", title: "Valid quantity", text: "The requested refund quantity must be at least one and cannot exceed the remaining unrefunded purchased quantity." },
     { code: "CONDITION_ALLOWED", title: "Condition requirement", text: "Changed-mind, late-delivery, and not-as-described returns must be unopened. Damaged or wrong-item claims may be opened or damaged, but not consumed/used." },
     { code: "REMAINING_BALANCE", title: "No over-refunding", text: "The item refund cannot make cumulative refunds exceed the order amount paid. Shipping is excluded from automated refunds." }
   ] satisfies RefundPolicyRule[],

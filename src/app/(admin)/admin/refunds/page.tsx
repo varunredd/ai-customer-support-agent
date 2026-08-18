@@ -42,7 +42,7 @@ export default function RefundsLedgerPage() {
           </table>
           <EmptyState
             title="No refunds processed yet"
-            description="Ledger rows will appear here after the Phase 2 execution loop writes idempotent refund records."
+            description="Phase 2 now persists idempotent refund records; Phase 3 will connect this ledger to the live database."
           />
         </div>
       </div>
