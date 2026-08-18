@@ -1,21 +1,14 @@
-export type AgentEventType =
-  | "REQUEST_RECEIVED"
-  | "TOOL_STARTED"
-  | "TOOL_SUCCEEDED"
-  | "TOOL_FAILED"
-  | "TOOL_RETRY"
-  | "POLICY_CHECK"
-  | "DECISION"
-  | "REFUND_EXECUTION";
-
-export type AgentEventStatus = "RUNNING" | "SUCCESS" | "FAILED" | "WARNING";
+import type { AgentEventStatus, AgentEventType } from "@/domain/agent/types";
 
 export interface AgentEventView {
   id: string;
+  sequence?: number;
   type: AgentEventType;
   timestamp: string;
   title: string;
-  status?: AgentEventStatus;
-  durationMs?: number;
-  metadata?: Record<string, unknown>;
+  status?: AgentEventStatus | null;
+  toolName?: string | null;
+  callId?: string | null;
+  durationMs?: number | null;
+  metadata?: Record<string, unknown> | null;
 }

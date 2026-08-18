@@ -5,15 +5,14 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { customers } from "@/data/customers";
 import { avatarColor, formatDate, getInitials } from "@/lib/format";
-import type { AccountStatus, RiskLevel } from "@/domain/refunds/types";
+import type { AccountStatus, Customer, RiskLevel } from "@/domain/refunds/types";
 import clsx from "clsx";
 
 type StatusFilter = "ALL" | AccountStatus;
 type RiskFilter = "ALL" | RiskLevel;
 
-export function CustomersDirectory() {
+export function CustomersDirectory({ customers }: { customers: Customer[] }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [risk, setRisk] = useState<RiskFilter>("ALL");

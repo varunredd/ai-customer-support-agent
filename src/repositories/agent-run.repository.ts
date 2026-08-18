@@ -129,7 +129,9 @@ export class AgentRunRepository {
       return id;
     });
 
-    return transaction.immediate();
+    const id = transaction.immediate();
+    const row = this.db.prepare("SELECT * FROM agent_events WHERE id = ?").get(id) as AgentEventRow;
+    return mapEvent(row);
   }
 
   setContext(runId: string, input: { customerId?: string; orderId?: string }) {
@@ -173,6 +175,15 @@ export class AgentRunRepository {
       run.events = events.map(mapEvent);
     }
     return run;
+  }
+
+
+  listEventsAfter(runId: string, afterSequence = 0): PersistedAgentEvent[] {
+    const safeSequence = Math.max(0, Math.trunc(afterSequence));
+    const rows = this.db
+      .prepare("SELECT * FROM agent_events WHERE run_id = ? AND sequence > ? ORDER BY sequence")
+      .all(runId, safeSequence) as AgentEventRow[];
+    return rows.map(mapEvent);
   }
 
   listRecent(limit = 50): PersistedAgentRun[] {

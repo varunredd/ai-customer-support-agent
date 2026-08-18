@@ -105,6 +105,36 @@ export const MIGRATIONS: DatabaseMigration[] = [
       CREATE INDEX idx_refunds_item_id ON refunds(item_id);
     `,
   },
+
+  {
+    version: 2,
+    name: "phase3_support_conversations",
+    sql: `
+      CREATE TABLE support_sessions (
+        id TEXT PRIMARY KEY,
+        customer_id TEXT NOT NULL REFERENCES customers(id),
+        order_id TEXT NOT NULL REFERENCES orders(id),
+        status TEXT NOT NULL CHECK (status IN ('OPEN', 'CLOSED')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_support_sessions_customer_id ON support_sessions(customer_id, updated_at DESC);
+      CREATE INDEX idx_support_sessions_order_id ON support_sessions(order_id, updated_at DESC);
+
+      CREATE TABLE support_messages (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES support_sessions(id) ON DELETE CASCADE,
+        run_id TEXT REFERENCES agent_runs(id),
+        role TEXT NOT NULL CHECK (role IN ('CUSTOMER', 'AGENT')),
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_support_messages_session_id ON support_messages(session_id, created_at);
+      CREATE INDEX idx_support_messages_run_id ON support_messages(run_id);
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.at(-1)?.version ?? 0;

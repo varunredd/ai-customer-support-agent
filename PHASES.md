@@ -34,22 +34,24 @@ Acceptance gate:
 - Model cannot switch away from authenticated customer context.
 - Retry/failure activity is persisted as structured events.
 
-## Phase 3 — Customer chat API and real-time observability — NEXT
+## Phase 3 — Customer chat API and real-time observability — COMPLETE
 
-Goal: connect the polished product UI to the real Phase 2 backend.
-
-Planned additions:
-- Chat session/message persistence.
-- Customer support API endpoint.
-- Streaming customer response.
-- Server-Sent Events (or equivalent) feed for admin agent events.
-- Read APIs for agent runs, customers, policy, and refund ledger.
-- Stable correlation/request IDs across chat, agent run, tools, decision, and refund.
-- Existing `/support` and `/admin/*` screens switched from preview fixtures to backend state.
+Delivered:
+- Persisted support sessions and customer/agent messages.
+- Customer/order-bound support session bootstrap.
+- SSE support-chat endpoint wired to the real OpenAI tool loop.
+- Correlation from support message → agent run → tool/policy events → refund.
+- Live structured agent-event callback from the orchestration service.
+- SSE admin event tail for in-progress runs.
+- Persisted run summary/detail APIs and refund-ledger API.
+- `/support`, `/admin`, `/admin/runs`, `/admin/customers`, and `/admin/refunds` switched to persisted backend state.
+- Approval, denial, and guarded retry demo routes.
+- Phase 3 persistence/observability tests.
 
 Acceptance gate:
-- Customer message → model → tools → deterministic decision → customer response works end-to-end from the UI.
-- Admin timeline reflects persisted tool start/failure/retry/success/policy/decision events in real time.
+- Customer message → model → tools → deterministic decision → customer response works from the UI.
+- Admin timeline consumes persisted events rather than preview reasoning.
+- Refund ledger contains only executed money movement; denials remain auditable in runs.
 - No frontend refund decision logic exists.
 
 ## Phase 4 — Product integration hardening

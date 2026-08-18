@@ -1,4 +1,5 @@
 import styles from "./ContextPanel.module.css";
+import type { Customer, Order } from "@/domain/refunds/types";
 import { customers } from "../../data/customers";
 import { orders } from "../../data/orders";
 import { StatusBadge } from "../ui/StatusBadge";
@@ -6,13 +7,15 @@ import { Card } from "../ui/Card";
 import { formatDate, formatMoney, getInitials } from "@/lib/format";
 
 interface ContextPanelProps {
-  customerId: string;
-  orderId: string;
+  customerId?: string;
+  orderId?: string;
+  customer?: Customer;
+  order?: Order;
 }
 
-export function ContextPanel({ customerId, orderId }: ContextPanelProps) {
-  const customer = customers.find((c) => c.id === customerId);
-  const order = orders.find((o) => o.id === orderId);
+export function ContextPanel({ customerId, orderId, customer: suppliedCustomer, order: suppliedOrder }: ContextPanelProps) {
+  const customer = suppliedCustomer ?? customers.find((c) => c.id === customerId);
+  const order = suppliedOrder ?? orders.find((o) => o.id === orderId);
 
   if (!customer || !order) return null;
 
