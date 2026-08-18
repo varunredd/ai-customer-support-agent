@@ -1,0 +1,38 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# local env files
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# local databases / runtime state
+*.db
+*.db-shm
+*.db-wal
+/data/runtime/
+
+# editors / OS
+.DS_Store
+.vscode/
+.idea/
+
+# test / coverage
+coverage/
+
+# generated phase bundles
+*.zip

@@ -1,0 +1,84 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { customers } from "../src/data/customers";
+import { orders } from "../src/data/orders";
+import { evaluateRefundEligibility } from "../src/services/refund-eligibility.service";
+import type { RefundRequest } from "../src/domain/refunds/types";
+
+const customer = (id: string) => {
+  const value = customers.find((entry) => entry.id === id);
+  assert.ok(value);
+  return value;
+};
+
+const order = (id: string) => {
+  const value = orders.find((entry) => entry.id === id);
+  assert.ok(value);
+  return value;
+};
+
+function request(overrides: Partial<RefundRequest> = {}): RefundRequest {
+  return {
+    customerId: "cus_001",
+    orderId: "ord_demo_approve",
+    itemId: "item_001",
+    quantity: 1,
+    reason: "CHANGED_MIND",
+    condition: "UNOPENED",
+    requestedAt: "2026-08-18T10:00:00Z",
+    ...overrides,
+  };
+}
+
+test("approves a standard eligible refund and refunds item price only", () => {
+  const result = evaluateRefundEligibility(customer("cus_001"), order("ord_demo_approve"), request());
+  assert.equal(result.decision, "APPROVE");
+  assert.equal(result.refundAmountCents, 8900);
+  assert.deepEqual(result.denialReasons, []);
+});
+
+test("denies a final-sale item", () => {
+  const result = evaluateRefundEligibility(
+    customer("cus_002"),
+    order("ord_demo_final_sale"),
+    request({ customerId: "cus_002", orderId: "ord_demo_final_sale", itemId: "item_002" }),
+  );
+  assert.equal(result.decision, "DENY");
+  assert.ok(result.denialReasons.some((reason) => reason.startsWith("NOT_FINAL_SALE")));
+});
+
+test("denies an out-of-window refund", () => {
+  const result = evaluateRefundEligibility(
+    customer("cus_003"),
+    order("ord_demo_expired"),
+    request({ customerId: "cus_003", orderId: "ord_demo_expired", itemId: "item_003" }),
+  );
+  assert.equal(result.decision, "DENY");
+  assert.ok(result.denialReasons.some((reason) => reason.startsWith("WITHIN_WINDOW")));
+});
+
+test("denies used merchandise for a changed-mind request", () => {
+  const result = evaluateRefundEligibility(
+    customer("cus_004"),
+    order("ord_demo_used"),
+    request({ customerId: "cus_004", orderId: "ord_demo_used", itemId: "item_004", condition: "USED" }),
+  );
+  assert.equal(result.decision, "DENY");
+  assert.ok(result.denialReasons.some((reason) => reason.startsWith("CONDITION_ALLOWED")));
+});
+
+test("denies automated refund for a high-risk account", () => {
+  const result = evaluateRefundEligibility(
+    customer("cus_006"),
+    order("ord_demo_high_risk"),
+    request({ customerId: "cus_006", orderId: "ord_demo_high_risk", itemId: "item_005" }),
+  );
+  assert.equal(result.decision, "DENY");
+  assert.ok(result.denialReasons.some((reason) => reason.startsWith("RISK_NOT_HIGH")));
+});
+
+test("prevents refund quantity from exceeding purchased quantity", () => {
+  const result = evaluateRefundEligibility(customer("cus_001"), order("ord_demo_approve"), request({ quantity: 2 }));
+  assert.equal(result.decision, "DENY");
+  assert.ok(result.denialReasons.some((reason) => reason.startsWith("VALID_QUANTITY")));
+});
