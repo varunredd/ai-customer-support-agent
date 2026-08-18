@@ -36,3 +36,12 @@ coverage/
 
 # generated phase bundles
 *.zip
+tsconfig.tsbuildinfo
+AGENTS.md
+CLAUDE.md
+
+# Phase 2 local SQLite directory
+/.data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

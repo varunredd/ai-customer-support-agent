@@ -1,76 +1,70 @@
 # Delivery Phases
 
-## Phase 1 — Domain foundation and policy engine
+## Phase 1 — Domain foundation and policy engine — COMPLETE
 
-Goal: create a runnable Next.js baseline where refund decisions are deterministic and testable before any LLM is introduced.
-
-Includes:
-- Next.js App Router shell.
-- 15 CRM customer fixtures.
-- Order fixtures for approval and multiple denial scenarios.
+Delivered:
+- Next.js App Router baseline.
+- 15 CRM fixtures and six order fixtures.
 - Strict refund policy document + machine-readable policy.
-- Repository interfaces.
-- Refund eligibility service.
-- Tool-facing functions.
-- Core tests and architecture notes.
+- Repository contracts.
+- Deterministic refund eligibility service.
+- Initial tool-facing application functions.
+- Core policy tests.
 
-Acceptance gate:
-- Strict TypeScript passes for domain modules.
-- Standard demo case approves for the expected amount.
-- Final-sale demo case denies with an explicit rule code.
+## Phase 2 — Persistence, LLM agent loop, execution safety — COMPLETE
 
-## Phase 2 — Persistence, LLM agent loop, execution safety
-
-Goal: make the backend genuinely agentic without giving the model authority over money rules.
-
-Planned additions:
-- Mature SQLite persistence adapter and seed/migration flow.
-- `customers`, `orders`, `order_items`, `refunds`, `agent_runs`, and `agent_events` tables.
+Delivered:
+- Versioned SQLite migration flow and deterministic seed/reset scripts.
+- `customers`, `orders`, `order_items`, `refunds`, `agent_runs`, and `agent_events` persistence.
 - OpenAI Responses API raw function-calling loop.
-- Tools: customer lookup, order lookup, refund-policy retrieval, deterministic eligibility validation, idempotent refund execution.
-- Maximum-step protection, malformed-tool-argument handling, tool retry policy, and structured errors.
-- Persisted agent event/audit trail suitable for the admin dashboard.
-- Idempotency key on refund execution so retrying the agent cannot double-refund.
-- API-level and orchestration tests.
+- Strict tools for customer lookup, order lookup, policy retrieval, deterministic validation, and refund execution.
+- Authenticated-customer authorization checks at the tool boundary.
+- Server-owned request timestamp and server-generated execution idempotency key.
+- Maximum-turn protection, malformed arguments, structured errors, timeouts, abort signals, and retries.
+- Structured persisted observability suitable for the admin UI without hidden chain-of-thought.
+- Atomic refund execution with policy revalidation inside the transaction.
+- Item-level refund quantity accounting and remaining-balance protection.
+- Exact idempotent replay of the original persisted refund evaluation.
+- Approval, denial, bypass, authorization, retry, idempotency, and failure tests.
 
 Acceptance gate:
-- An LLM must call tools rather than inventing CRM/policy facts.
-- A successful refund produces exactly one refund ledger record under retries.
-- A denied refund can never invoke successful execution.
+- Model orchestration cannot bypass deterministic policy.
+- Same refund execution within a run cannot double-refund.
+- A final-sale refund remains blocked even if the model calls execution directly.
+- Model cannot switch away from authenticated customer context.
+- Retry/failure activity is persisted as structured events.
 
-## Phase 3 — Customer chat API and real-time observability
+## Phase 3 — Customer chat API and real-time observability — NEXT
 
-Goal: expose the agent as a product vertical slice.
+Goal: connect the polished product UI to the real Phase 2 backend.
 
 Planned additions:
 - Chat session/message persistence.
-- Streaming customer response endpoint.
+- Customer support API endpoint.
+- Streaming customer response.
 - Server-Sent Events (or equivalent) feed for admin agent events.
-- Session correlation IDs across chat, agent run, tool call, decision, and refund.
-- Failure/retry events designed for the assignment walkthrough.
-- API contract documentation for frontend work.
+- Read APIs for agent runs, customers, policy, and refund ledger.
+- Stable correlation/request IDs across chat, agent run, tools, decision, and refund.
+- Existing `/support` and `/admin/*` screens switched from preview fixtures to backend state.
 
 Acceptance gate:
-- Customer message -> agent -> tools -> decision -> response works end-to-end.
-- Admin event stream reflects tool start/success/failure/retry/decision in real time.
+- Customer message → model → tools → deterministic decision → customer response works end-to-end from the UI.
+- Admin timeline reflects persisted tool start/failure/retry/success/policy/decision events in real time.
+- No frontend refund decision logic exists.
 
-## Phase 4 — Product UI integration
+## Phase 4 — Product integration hardening
 
-Goal: finish the evaluated UI while keeping frontend implementation separable from backend correctness.
+Goal: finish the evaluated web product after the real APIs exist.
 
 Recommended delegation:
-- Antigravity: customer chat page and admin dashboard visual implementation from provided API contracts.
-- Cursor: integrate components against the real APIs, fix type/build/runtime issues, review client/server boundaries.
-- Main engineering review: reject any frontend shortcut that bypasses backend policy or mocks reasoning logs.
-
-Planned product surfaces:
-- Customer chat with identity/order context.
-- Admin dashboard with agent runs, tool calls, rule checks, failures, retries, final decisions, and refund status.
-- Demo fixture shortcuts only in development mode.
+- Antigravity: visual refinements and interaction polish only.
+- Cursor: client/server integration review, TypeScript/build/runtime bug pass.
+- Main engineering review: reject shortcuts that fabricate backend state or duplicate policy logic.
 
 Acceptance gate:
 - UI has zero hardcoded refund decisions.
-- Admin logs come from persisted backend events, not fabricated frontend steps.
+- Admin logs are persisted backend events, not fake frontend reasoning.
+- Loading, empty, error, retry, approval, and denial states are polished.
 
 ## Phase 5 — Voice bonus
 
@@ -78,27 +72,25 @@ Goal: add voice only after the text path is correct.
 
 Planned additions:
 - OpenAI Realtime browser voice connection via WebRTC.
-- Server-minted short-lived session/client credential; long-lived API key never exposed to browser.
-- Voice transcript routed into the same refund business tools/decision path.
-- Graceful fallback to text if microphone or realtime connection fails.
+- Server-created short-lived browser credential/session.
+- Transcript routed through the same deterministic refund tools.
+- Text fallback when realtime/microphone access fails.
 
 Acceptance gate:
-- Voice cannot bypass deterministic refund validation.
-- Browser bundle contains no server API secret.
+- Voice cannot bypass deterministic validation.
+- Browser bundle contains no long-lived OpenAI secret.
 
 ## Phase 6 — Hardening, submission, and demo package
 
-Goal: optimize for the actual hiring evaluation.
-
 Includes:
-- Full regression and build pass.
-- Edge/failure cases and seeded demo reset.
-- README with architecture diagram, setup, env, demo accounts/cases, and tradeoffs.
-- GitHub hygiene and deployment configuration.
-- 7–10 minute walkthrough script covering live approve, live deny, architecture, orchestration, logs/retries, and optional voice.
-- Final senior-engineering review with Cursor/Antigravity feedback incorporated only after verification.
+- Full regression/build pass.
+- Clean demo reset.
+- Final README and architecture diagram.
+- Public GitHub hygiene and deployment configuration.
+- 7–10 minute walkthrough covering approve, deny, failure/retry, architecture, observability, and optional voice.
+- Final senior-engineering review before submission.
 
 Acceptance gate:
-- Clean clone -> install -> seed -> run works from README.
-- Both required demo paths are deterministic.
-- No secret or local database is committed.
+- Clean clone → install → reset/seed → verify → run follows README.
+- Required demo paths are deterministic.
+- No secrets, local databases, or generated runtime state are committed.

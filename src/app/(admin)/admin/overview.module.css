@@ -1,0 +1,40 @@
+.attentionList {
+  display: flex;
+  flex-direction: column;
+}
+
+.attentionItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.attentionItem:last-child {
+  border-bottom: none;
+}
+
+.attentionItem:hover {
+  background: #f8fafc;
+}
+
+.attentionItem strong {
+  display: block;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.attentionItem span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.attentionBadges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
