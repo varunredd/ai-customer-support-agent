@@ -1,0 +1,36 @@
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 8px 8px 8px 16px;
+}
+
+.composer:focus-within {
+  background: white;
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+}
+
+.input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 1rem;
+  outline: none;
+  min-height: 40px;
+}
+
+.input::placeholder {
+  color: var(--muted);
+}
+
+.sendButton {
+  border-radius: 11px;
+  height: 36px;
+  width: 36px;
+  padding: 0;
+}

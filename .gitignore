@@ -36,3 +36,6 @@ coverage/
 
 # generated phase bundles
 *.zip
+tsconfig.tsbuildinfo
+AGENTS.md
+CLAUDE.md
