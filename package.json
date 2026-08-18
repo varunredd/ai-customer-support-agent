@@ -15,7 +15,11 @@
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:seed": "tsx scripts/db-seed.ts",
     "db:reset": "tsx scripts/db-reset.ts",
-    "demo:agent": "tsx scripts/run-agent-demo.ts"
+    "demo:agent": "tsx scripts/run-agent-demo.ts",
+    "demo:check": "tsx scripts/verify-demo-fixtures.ts",
+    "demo:reset": "npm run db:reset && npm run demo:check",
+    "submission:audit": "tsx scripts/submission-audit.ts",
+    "submission:check": "npm run submission:audit && npm run demo:check && npm run verify"
   },
   "dependencies": {
     "@next/env": "16.3.1",
