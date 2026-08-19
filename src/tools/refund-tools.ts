@@ -1,7 +1,7 @@
 import type { ExecuteRefundInput } from "@/domain/refunds/execution";
 import type { RefundRequest } from "@/domain/refunds/types";
 import { getApplicationRepositories } from "@/repositories";
-import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
+import { RefundPolicyNotFoundError, RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 import { evaluateRefundEligibility } from "@/services/refund-eligibility.service";
 import { executeRefundAtomically } from "@/services/refund-execution.service";
 
@@ -32,11 +32,26 @@ export async function validateRefundRequest(request: RefundRequest) {
     return { decision: "DENY" as const, refundAmountCents: 0, checks: [], denialReasons: ["ORDER_NOT_FOUND: Order does not exist."] };
   }
 
+  let policy;
+  try {
+    policy = new RefundPolicyRepository(db).getActive();
+  } catch (error) {
+    if (error instanceof RefundPolicyNotFoundError) {
+      return {
+        decision: "DENY" as const,
+        refundAmountCents: 0,
+        checks: [],
+        denialReasons: ["POLICY_NOT_PUBLISHED: No active refund policy is published."],
+        policyVersion: null,
+      };
+    }
+    throw error;
+  }
+
   const refunded = db
     .prepare("SELECT COALESCE(SUM(quantity), 0) AS quantity FROM refunds WHERE item_id = ?")
     .get(request.itemId) as { quantity: number };
 
-  const policy = new RefundPolicyRepository(db).getActive();
   const evaluation = evaluateRefundEligibility(customer, order, request, {
     alreadyRefundedItemQuantity: refunded.quantity,
     policy,

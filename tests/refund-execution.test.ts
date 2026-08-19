@@ -3,10 +3,12 @@ import test from "node:test";
 import { createDatabase } from "@/db/database";
 import { seedCatalog } from "@/db/seed";
 import { executeRefundAtomically, IdempotencyConflictError } from "@/services/refund-execution.service";
+import { seedActiveTestPolicy } from "./helpers/seed-policy";
 
 function setup() {
   const db = createDatabase(":memory:");
   seedCatalog(db);
+  seedActiveTestPolicy(db);
   return db;
 }
 

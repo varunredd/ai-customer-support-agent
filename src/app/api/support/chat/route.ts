@@ -90,6 +90,13 @@ export async function POST(request: Request) {
     role: "CUSTOMER",
     content: message,
   });
+  const conversationHistory = sessions
+    .listMessages(sessionId)
+    .filter((entry) => entry.id !== customerMessage.id)
+    .map((entry) => ({
+      role: entry.role === "CUSTOMER" ? ("user" as const) : ("assistant" as const),
+      content: entry.content,
+    }));
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -125,6 +132,7 @@ export async function POST(request: Request) {
               message,
               customerEmail: detail.customer.email,
               orderId: detail.order.id,
+              conversationHistory,
             },
             {
               onEvent: async (event: PersistedAgentEvent) => {

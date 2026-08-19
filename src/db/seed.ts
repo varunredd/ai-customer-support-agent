@@ -1,7 +1,6 @@
 import type { AppDatabase } from "@/db/database";
 import { customers } from "@/data/customers";
 import { orders } from "@/data/orders";
-import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 
 export function seedCatalog(db: AppDatabase) {
   const insertCustomer = db.prepare(`
@@ -119,5 +118,4 @@ export function seedCatalog(db: AppDatabase) {
   });
 
   transaction();
-  new RefundPolicyRepository(db).ensureDefault();
 }

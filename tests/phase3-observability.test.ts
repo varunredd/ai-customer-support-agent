@@ -6,6 +6,7 @@ import type { PersistedAgentEvent } from "@/domain/agent/types";
 import { AdminReadRepository } from "@/repositories/admin-read.repository";
 import { runSupportAgent } from "@/services/agent/support-agent.service";
 import { ScriptedAgentModel, finalResponse, toolCall } from "./helpers/scripted-agent-model";
+import { seedActiveTestPolicy } from "./helpers/seed-policy";
 
 const approveArgs = {
   customerId: "cus_001",
@@ -19,6 +20,7 @@ const approveArgs = {
 test("agent event observer receives persisted events in sequence for live streaming", async () => {
   const db = createDatabase(":memory:");
   seedCatalog(db);
+  seedActiveTestPolicy(db);
   const observed: PersistedAgentEvent[] = [];
   try {
     const model = new ScriptedAgentModel([
@@ -56,6 +58,7 @@ test("agent event observer receives persisted events in sequence for live stream
 test("admin refund read model exposes only persisted money movement", async () => {
   const db = createDatabase(":memory:");
   seedCatalog(db);
+  seedActiveTestPolicy(db);
   try {
     const model = new ScriptedAgentModel([
       toolCall("p3-r1", "validate_refund_request", approveArgs),

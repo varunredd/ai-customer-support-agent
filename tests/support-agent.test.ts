@@ -4,7 +4,9 @@ import { createDatabase } from "@/db/database";
 import { seedCatalog } from "@/db/seed";
 import { AgentRunRepository } from "@/repositories/agent-run.repository";
 import { runSupportAgent } from "@/services/agent/support-agent.service";
+import type { AgentModelRequest } from "@/services/agent/model";
 import { ScriptedAgentModel, finalResponse, toolCall } from "./helpers/scripted-agent-model";
+import { seedActiveTestPolicy } from "./helpers/seed-policy";
 
 const approveToolArgs = {
   customerId: "cus_001",
@@ -18,6 +20,7 @@ const approveToolArgs = {
 function setup() {
   const db = createDatabase(":memory:");
   seedCatalog(db);
+  seedActiveTestPolicy(db);
   return db;
 }
 
@@ -229,6 +232,41 @@ test("malformed function arguments become a structured tool failure rather than 
         (event) => event.type === "TOOL_FAILED" && typeof event.metadata?.error === "object" && event.metadata.error !== null,
       ),
     );
+  } finally {
+    db.close();
+  }
+});
+
+test("prior session messages are passed to the model as conversation history", async () => {
+  const db = setup();
+  try {
+    let capturedRequest: AgentModelRequest | null = null;
+    const model: import("@/services/agent/model").AgentModel = {
+      model: "capturing-test-model",
+      async createResponse(request) {
+        capturedRequest = request;
+        return finalResponse("h1", "Thanks, I have everything I need.");
+      },
+    };
+
+    await runSupportAgent(db, model, {
+      message: "It is unopened and I want to return quantity 1.",
+      customerEmail: "maya@example.com",
+      orderId: "ord_8901",
+      requestedAt: "2026-08-18T12:00:00Z",
+      conversationHistory: [
+        { role: "assistant", content: "Hi Maya. I can help with order ord_8901." },
+        { role: "user", content: "The microphone in the headphones stopped working." },
+        { role: "assistant", content: "Could you confirm the item condition and quantity?" },
+      ],
+    });
+
+    assert.ok(capturedRequest);
+    const input = capturedRequest!.input as Array<{ role: string; content: string }>;
+    assert.equal(input.length, 4);
+    assert.equal(input[0]?.role, "assistant");
+    assert.match(input[1]?.content ?? "", /microphone in the headphones stopped working/i);
+    assert.match(input[3]?.content ?? "", /Customer message:\nIt is unopened/i);
   } finally {
     db.close();
   }

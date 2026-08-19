@@ -47,12 +47,18 @@ export interface PersistedAgentRun {
   events?: PersistedAgentEvent[];
 }
 
+export interface AgentConversationTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface RunSupportAgentInput {
   message: string;
   customerEmail?: string;
   orderId?: string;
   requestedAt?: string;
   runId?: string;
+  conversationHistory?: AgentConversationTurn[];
 }
 
 export interface RunSupportAgentResult {

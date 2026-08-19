@@ -68,6 +68,14 @@ function buildUserInput(input: RunSupportAgentInput, requestedAt: string) {
   return `${contextLines.join("\n")}\n\nCustomer message:\n${input.message}`;
 }
 
+function buildConversationInput(input: RunSupportAgentInput, requestedAt: string): unknown[] {
+  const history = (input.conversationHistory ?? []).map((turn) => ({
+    role: turn.role,
+    content: turn.content,
+  }));
+  return [...history, { role: "user", content: buildUserInput(input, requestedAt) }];
+}
+
 async function maybeLogDeterministicEvents(
   appendEvent: (input: Parameters<AgentRunRepository["appendEvent"]>[0]) => Promise<PersistedAgentEvent>,
   runId: string,
@@ -181,7 +189,7 @@ export async function runSupportAgent(
     metadata: { customerContextBound: Boolean(input.customerEmail), requestedAt },
   });
 
-  const conversationInput: unknown[] = [{ role: "user", content: userInput }];
+  const conversationInput: unknown[] = buildConversationInput(input, requestedAt);
 
   try {
     for (let turn = 1; turn <= maxTurns; turn += 1) {
