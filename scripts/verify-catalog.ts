@@ -41,7 +41,7 @@ try {
   assertEqual(counts.agentEvents, 0, "Catalog reset must remove runtime agent events");
   assertEqual(counts.supportSessions, 0, "Catalog reset must remove support sessions");
   assertEqual(counts.supportMessages, 0, "Catalog reset must remove support messages");
-  assertEqual(counts.policyVersions, 1, "Catalog reset must contain exactly one active policy version");
+  assertEqual(counts.policyVersions, 0, "Catalog reset must not auto-seed refund policy versions");
   assertEqual(counts.notificationOutbox, 0, "Catalog reset must remove notification jobs");
   assertEqual(counts.operationalEvents, 0, "Catalog reset must remove operational events");
   assertEqual(counts.escalations, 0, "Catalog reset must remove human escalations");

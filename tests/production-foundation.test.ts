@@ -15,10 +15,12 @@ import { evaluateRefundEligibility } from "@/services/refund-eligibility.service
 import { parseBusinessContextSnapshot, syncBusinessContext } from "@/services/integrations/business-sync.service";
 import { createIntegratedSupportLaunch } from "@/services/integrations/support-launch.service";
 import { createSqliteCustomerRepository, createSqliteOrderRepository } from "@/repositories/sqlite";
+import { seedActiveTestPolicy } from "./helpers/seed-policy";
 
 function setup() {
   const db = createDatabase(":memory:");
   seedCatalog(db);
+  seedActiveTestPolicy(db);
   return db;
 }
 
@@ -64,7 +66,7 @@ test("completed refund records policy version and enqueues one durable notificat
     });
     assert.equal(result.status, "COMPLETED");
     if (result.status !== "COMPLETED") return;
-    assert.equal(result.refund.policyVersion, "2026-08-18");
+    assert.equal(result.refund.policyVersion, "test-policy");
     const outbox = new NotificationOutboxRepository(db).listRecent();
     assert.equal(outbox.length, 1);
     assert.equal(outbox[0]?.eventType, "REFUND_COMPLETED");

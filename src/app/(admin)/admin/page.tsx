@@ -4,7 +4,7 @@ import { getDatabase } from "@/db/database";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { REFUND_POLICY } from "@/domain/refunds/policy";
+import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 import { formatTime } from "@/lib/format";
 import { AdminReadRepository } from "@/repositories/admin-read.repository";
 import styles from "./overview.module.css";
@@ -30,6 +30,8 @@ export default function AdminOverviewPage() {
   const highRisk = (db.prepare("SELECT COUNT(*) AS count FROM customers WHERE risk_level = 'HIGH'").get() as { count: number }).count;
   const todayRuns = (db.prepare("SELECT COUNT(*) AS count FROM agent_runs WHERE date(started_at) = date('now')").get() as { count: number }).count;
   const completedToday = (db.prepare("SELECT COUNT(*) AS count FROM agent_runs WHERE date(started_at) = date('now') AND status = 'COMPLETED'").get() as { count: number }).count;
+  const activePolicy = new RefundPolicyRepository(db).getActiveOrNull();
+  const policyRuleCount = activePolicy?.rules.filter((rule) => rule.enabled).length ?? 0;
   const deniedCount = (db.prepare("SELECT COUNT(*) AS count FROM agent_events WHERE type = 'DECISION' AND status = 'FAILED'").get() as { count: number }).count;
   const attention = db
     .prepare("SELECT id, name, email, account_status, risk_level FROM customers WHERE risk_level = 'HIGH' OR account_status = 'SUSPENDED' ORDER BY name")
@@ -46,7 +48,7 @@ export default function AdminOverviewPage() {
           <StatCard label="Customers" value={String(customerCount)} hint={`${suspended} suspended · ${highRisk} high risk`} icon={<Users size={16} />} />
           <StatCard label="Orders in scope" value={String(orderCount)} hint="Canonical orders currently in Jobform" icon={<Activity size={16} />} />
           <StatCard label="Agent runs today" value={String(todayRuns)} hint={`${completedToday} completed`} icon={<CheckCircle2 size={16} />} />
-          <StatCard label="Policy engine" value={`${REFUND_POLICY.rules.length} rules`} hint={`${deniedCount} persisted deterministic denials`} tone="success" icon={<ShieldAlert size={16} />} />
+          <StatCard label="Policy engine" value={activePolicy ? `${policyRuleCount} rules` : "Not published"} hint={activePolicy ? `${deniedCount} persisted deterministic denials` : "Publish a policy to enable refunds"} tone={activePolicy ? "success" : "warning"} icon={<ShieldAlert size={16} />} />
         </div>
 
         <div className="content-grid">
