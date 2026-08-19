@@ -12,7 +12,7 @@ export default function PolicyPage() {
 
   return (
     <div className="admin-page">
-      <div className="admin-stack">
+      <div className="admin-stack admin-stack-wide">
         <PageHeader
           title="Refund Policy"
           description="Configure the machine-checkable rules that approve or deny refunds. Customer and order data sync from the e-commerce store."
