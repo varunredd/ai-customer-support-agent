@@ -6,7 +6,7 @@ import { buildPolicyDefinition } from "../src/domain/refunds/policy";
 import { evaluateRefundEligibility } from "../src/services/refund-eligibility.service";
 import type { RefundRequest } from "../src/domain/refunds/types";
 
-const testPolicy = buildPolicyDefinition({ version: "test-policy", refundWindowDays: 30 });
+const testPolicy = buildPolicyDefinition({ version: "test-policy", refundWindowDays: 30, enableCore: true });
 
 const customer = (id: string) => {
   const value = customers.find((entry) => entry.id === id);

@@ -1,6 +1,7 @@
 import { getDatabase } from "@/db/database";
 import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 import { hasStaffApiAccess } from "@/security/admin-control";
+import { catalogRuleTemplates } from "@/domain/refunds/policy";
 import type { RefundPolicyRule } from "@/domain/refunds/policy";
 
 export const runtime = "nodejs";
@@ -12,10 +13,16 @@ function parseRules(body: Record<string, unknown>): RefundPolicyRule[] | undefin
   return body.rules as RefundPolicyRule[];
 }
 
+function backfillPolicyRules(repository: RefundPolicyRepository) {
+  const active = repository.getActiveOrNull();
+  if (!active || active.rules.length > 0) return active;
+  return repository.updateActive({ rules: catalogRuleTemplates() });
+}
+
 export async function GET() {
   const repository = new RefundPolicyRepository(getDatabase());
   repository.activatePendingDraft();
-  const active = repository.getActiveOrNull();
+  const active = backfillPolicyRules(repository);
   return Response.json({ policy: active });
 }
 
@@ -26,7 +33,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json() as Record<string, unknown>;
     const refundWindowDays = typeof body.refundWindowDays === "number" ? body.refundWindowDays : 30;
-    const rules = parseRules(body) ?? undefined;
+    const rules = parseRules(body) ?? catalogRuleTemplates();
     const policy = new RefundPolicyRepository(getDatabase()).createActive({
       refundWindowDays,
       rules,

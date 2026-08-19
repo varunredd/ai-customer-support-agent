@@ -4,6 +4,7 @@ import { createDatabase } from "@/db/database";
 import { seedCatalog } from "@/db/seed";
 import { AgentRunRepository } from "@/repositories/agent-run.repository";
 import { NotificationOutboxRepository } from "@/repositories/notification-outbox.repository";
+import { catalogRuleTemplates } from "@/domain/refunds/policy";
 import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 import { signIntegrationPayload, verifyIntegrationRequest } from "@/security/integration-signature";
 import { assertSupportSessionAccess, createSupportLaunchToken, SupportAccessError, verifySupportLaunchToken } from "@/security/support-access";
@@ -28,7 +29,11 @@ test("published refund policy version changes deterministic eligibility at runti
   const db = setup();
   try {
     const policies = new RefundPolicyRepository(db);
-    const draft = policies.createDraft({ version: "prod-test-1-day", refundWindowDays: 1 });
+    const draft = policies.createDraft({
+      version: "prod-test-1-day",
+      refundWindowDays: 1,
+      rules: catalogRuleTemplates({ enableCore: true }),
+    });
     const active = policies.publish(draft.id);
     const customer = await createSqliteCustomerRepository(db).findById("cus_001");
     const order = await createSqliteOrderRepository(db).findById("ord_8901");
