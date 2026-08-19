@@ -4,6 +4,7 @@ import Database from "better-sqlite3";
 import { MIGRATIONS, MIGRATION_TABLE_SQL } from "@/db/schema";
 import { purgeLegacySampleCatalog } from "@/db/clear-business-data";
 import { seedCatalog } from "@/db/seed";
+import { ensureEcommerceSyncSchedulerStarted } from "@/services/integrations/ecommerce-sync-scheduler";
 
 export type AppDatabase = Database.Database;
 
@@ -53,6 +54,7 @@ export function getDatabase(): AppDatabase {
     const filename = process.env.DATABASE_PATH?.trim() || ".data/jobform-support.sqlite";
     singleton = createDatabase(filename);
     purgeLegacySampleCatalog(singleton);
+    ensureEcommerceSyncSchedulerStarted();
     const customerCount = (singleton.prepare("SELECT COUNT(*) AS count FROM customers").get() as { count: number }).count;
     if (customerCount === 0) {
       const allowSeed = process.env.SEED_SAMPLE_CATALOG?.trim().toLowerCase() === "true";
