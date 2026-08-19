@@ -15,7 +15,7 @@ export default function PolicyPage() {
       <div className="admin-stack admin-stack-wide">
         <PageHeader
           title="Refund Policy"
-          description="Configure the machine-checkable rules that approve or deny refunds. Customer and order data sync from the e-commerce store."
+          description="Configure machine-checkable refund rules. NovaShop customers and orders sync automatically in the background."
         />
         <PolicyManager
           initialPolicies={policies}

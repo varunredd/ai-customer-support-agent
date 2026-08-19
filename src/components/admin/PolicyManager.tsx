@@ -29,8 +29,6 @@ interface PolicyManagerProps {
   activePolicyId: string | null;
 }
 
-type Tab = "policy" | "store";
-
 const RULE_LABELS: Record<RefundPolicyRuleCode, string> = {
   ACCOUNT_ACTIVE: "Account active",
   RISK_NOT_HIGH: "Risk gate",
@@ -81,12 +79,10 @@ export function PolicyManager({ initialPolicies, activePolicyId }: PolicyManager
   const [draftRules, setDraftRules] = useState<RefundPolicyRule[]>(() => cloneRules(initialSelected?.rules ?? []));
   const [draftVersion, setDraftVersion] = useState(initialSelected?.version ?? "");
   const [draftWindow, setDraftWindow] = useState(initialSelected?.refundWindowDays ?? 30);
-  const [tab, setTab] = useState<Tab>("policy");
   const [showArchived, setShowArchived] = useState(false);
   const [showNewDraft, setShowNewDraft] = useState(false);
   const [newVersion, setNewVersion] = useState(todayVersion());
   const [newWindow, setNewWindow] = useState(30);
-  const [customerId, setCustomerId] = useState("");
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -121,7 +117,6 @@ export function PolicyManager({ initialPolicies, activePolicyId }: PolicyManager
     setDraftWindow(policy.refundWindowDays);
     setExpandedRule(null);
     setMessage(null);
-    setTab("policy");
   }
 
   async function refreshPolicies(nextSelectedId?: string) {
@@ -242,57 +237,6 @@ export function PolicyManager({ initialPolicies, activePolicyId }: PolicyManager
       setMessage("Draft deleted.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to delete draft.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function syncFromEcommerce(syncAll = false) {
-    if (!syncAll && !customerId.trim()) {
-      setMessage("Enter a customer ID or use sync all.");
-      return;
-    }
-    setBusy(true);
-    setMessage(null);
-    try {
-      const response = await fetch("/api/admin/integrations/ecommerce/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(syncAll ? { syncAll: true } : { customerId: customerId.trim() }),
-      });
-      const payload = await response.json() as {
-        error?: { message: string };
-        syncedOrders?: number;
-        syncedCustomers?: number;
-      };
-      if (!response.ok) throw new Error(payload.error?.message ?? "Unable to sync from e-commerce.");
-      setMessage(syncAll
-        ? `Synced ${payload.syncedCustomers ?? 0} customers, ${payload.syncedOrders ?? 0} orders.`
-        : `Synced ${payload.syncedOrders ?? 0} orders.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to sync from e-commerce.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function clearSampleData() {
-    if (!window.confirm("Clear all customers, orders, refunds, and policies? Staff login is unaffected.")) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      const response = await fetch("/api/admin/system/clear-data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm: true }),
-      });
-      const payload = await response.json() as { error?: { message: string } };
-      if (!response.ok) throw new Error(payload.error?.message ?? "Unable to clear data.");
-      setPolicies([]);
-      setSelectedId(null);
-      setMessage("Data cleared. Create a policy, then sync store customers.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to clear data.");
     } finally {
       setBusy(false);
     }
@@ -468,16 +412,7 @@ export function PolicyManager({ initialPolicies, activePolicyId }: PolicyManager
           )}
         </div>
 
-        <div className={styles.tabs}>
-          <button type="button" className={clsx(styles.tab, tab === "policy" && styles.tabActive)} onClick={() => setTab("policy")}>
-            Policy
-          </button>
-          <button type="button" className={clsx(styles.tab, tab === "store" && styles.tabActive)} onClick={() => setTab("store")}>
-            Store data
-          </button>
-        </div>
-
-        {tab === "policy" && selected && isEditable ? (
+        {selected && isEditable ? (
           <div className={styles.topActions}>
             {selected.status === "DRAFT" ? (
               <>
@@ -492,21 +427,20 @@ export function PolicyManager({ initialPolicies, activePolicyId }: PolicyManager
         ) : null}
       </div>
 
-      {tab === "policy" ? (
-        policies.length === 0 ? (
-          <div className={styles.main}>
-            <div className={styles.emptyState}>
-              <h2 className={styles.emptyTitle}>Set up your refund policy</h2>
-              <p className={styles.emptyText}>
-                Create a default policy with standard rules, publish it, then sync store customers from the Store data tab.
-              </p>
-              <button type="button" className={styles.button} disabled={busy} onClick={() => void createDefaultPolicy()}>
-                Create default policy
-              </button>
-            </div>
+      {policies.length === 0 ? (
+        <div className={styles.main}>
+          <div className={styles.emptyState}>
+            <h2 className={styles.emptyTitle}>Set up your refund policy</h2>
+            <p className={styles.emptyText}>
+              Create a default policy with standard rules and publish it. Customer and order data sync automatically from NovaShop.
+            </p>
+            <button type="button" className={styles.button} disabled={busy} onClick={() => void createDefaultPolicy()}>
+              Create default policy
+            </button>
           </div>
-        ) : (
-          <div className={styles.layout}>
+        </div>
+      ) : (
+        <div className={styles.layout}>
             <aside className={styles.sidebar}>
               <div className={styles.sidebarHeader}>Versions</div>
               <ul className={styles.versionList}>
@@ -602,33 +536,7 @@ export function PolicyManager({ initialPolicies, activePolicyId }: PolicyManager
               </section>
             ) : null}
           </div>
-        )
-      ) : (
-        <div className={styles.storePanel}>
-          <h2 className={styles.mainTitle}>E-commerce sync</h2>
-          <p className={styles.storeHelp}>
-            Import real NovaShop customers and orders. Use this after clearing demo data or when new orders need to appear in Jobform.
-          </p>
-          <div className={styles.storeActions}>
-            <button type="button" className={styles.button} disabled={busy} onClick={() => void syncFromEcommerce(true)}>
-              Sync all customers
-            </button>
-            <p className={styles.storeHelp}>Up to 500 customers, 20 recent orders each.</p>
-            <div className={styles.advancedSync}>
-              <label className={styles.fieldLabel}>
-                Sync one customer (MongoDB user ID)
-                <input className={styles.input} value={customerId} onChange={(e) => setCustomerId(e.target.value)} placeholder="MongoDB _id" />
-              </label>
-              <button type="button" className={styles.buttonSecondary} disabled={busy} onClick={() => void syncFromEcommerce(false)}>
-                Sync customer
-              </button>
-              <button type="button" className={styles.linkButton} disabled={busy} onClick={() => void clearSampleData()}>
-                Clear all business data
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }
