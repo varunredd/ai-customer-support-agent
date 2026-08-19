@@ -25,13 +25,10 @@ export async function POST(request: Request) {
   }
   try {
     const body = await request.json() as Record<string, unknown>;
-    if (typeof body.refundWindowDays !== "number") {
-      throw new Error("refundWindowDays is required.");
-    }
-    const starter = body.starter === "blank" ? "blank" : "recommended";
-    const rules = parseRules(body) ?? (starter === "blank" ? [] : undefined);
+    const refundWindowDays = typeof body.refundWindowDays === "number" ? body.refundWindowDays : 30;
+    const rules = parseRules(body) ?? undefined;
     const policy = new RefundPolicyRepository(getDatabase()).createActive({
-      refundWindowDays: body.refundWindowDays,
+      refundWindowDays,
       rules,
     });
     return Response.json({ policy }, { status: 201 });

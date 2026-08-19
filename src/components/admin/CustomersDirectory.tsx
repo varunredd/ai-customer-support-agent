@@ -34,10 +34,7 @@ export function CustomersDirectory({ customers }: { customers: Customer[] }) {
   return (
     <div className="admin-page">
       <div className="admin-stack">
-        <PageHeader
-          title="Customers"
-          description="Searchable CRM directory with account status and refund risk."
-        />
+        <PageHeader title="Customers" />
 
         <div className="toolbar">
           <label className="search-field">
@@ -45,7 +42,7 @@ export function CustomersDirectory({ customers }: { customers: Customer[] }) {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search name, email, or customer ID"
+              placeholder="Search customers"
             />
           </label>
           {(["ALL", "ACTIVE", "SUSPENDED"] as StatusFilter[]).map((value) => (

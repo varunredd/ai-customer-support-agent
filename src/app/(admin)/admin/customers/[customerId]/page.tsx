@@ -78,10 +78,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
         <section className="panel">
           <div className="panel-header">
-            <div>
-              <h2 className="panel-title">Order history</h2>
-              <p className="panel-subtitle">{customerOrders.length} orders linked to this account.</p>
-            </div>
+            <h2 className="panel-title">Orders</h2>
           </div>
           <table className="table">
             <thead>

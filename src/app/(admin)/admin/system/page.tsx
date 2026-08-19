@@ -19,9 +19,9 @@ export default function SystemPage() {
   return (
     <div className="admin-page">
       <div className="admin-stack">
-        <PageHeader title="System Operations" description="Production-facing operational failures, integration events, and durable notification delivery state." />
+        <PageHeader title="System" />
         <section className="panel">
-          <div className="panel-header"><div><h2 className="panel-title">Operational events</h2><p className="panel-subtitle">Structured application-level failures and service events. Sensitive metadata is redacted before persistence.</p></div></div>
+          <div className="panel-header"><h2 className="panel-title">Events</h2></div>
           <div style={{ overflowX: "auto" }}>
             <table className="table">
               <thead><tr><th>Time</th><th>Severity</th><th>Source</th><th>Code</th><th>Message</th></tr></thead>
@@ -30,7 +30,7 @@ export default function SystemPage() {
           </div>
         </section>
         <section className="panel">
-          <div className="panel-header"><div><h2 className="panel-title">Notification outbox</h2><p className="panel-subtitle">Refund email side effects are durable and independent from money execution.</p></div></div>
+          <div className="panel-header"><h2 className="panel-title">Notifications</h2></div>
           <div style={{ overflowX: "auto" }}>
             <table className="table">
               <thead><tr><th>Created</th><th>Type</th><th>Status</th><th>Attempts</th><th>Provider ID</th></tr></thead>
