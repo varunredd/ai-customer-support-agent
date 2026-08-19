@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDatabase } from "@/db/database";
-import { seedDemoData } from "@/db/seed";
+import { seedCatalog } from "@/db/seed";
 import { executeRefundAtomically, IdempotencyConflictError } from "@/services/refund-execution.service";
 
 function setup() {
   const db = createDatabase(":memory:");
-  seedDemoData(db);
+  seedCatalog(db);
   return db;
 }
 
@@ -17,7 +17,7 @@ test("atomic refund execution creates one ledger row and replays the exact persi
       idempotencyKey: "idem-approve-001",
       request: {
         customerId: "cus_001",
-        orderId: "ord_demo_approve",
+        orderId: "ord_8901",
         itemId: "item_001",
         quantity: 1,
         reason: "CHANGED_MIND" as const,
@@ -38,11 +38,11 @@ test("atomic refund execution creates one ledger row and replays the exact persi
     assert.equal(second.idempotentReplay, true);
     assert.deepEqual(second.evaluation, first.evaluation);
     assert.equal(
-      (db.prepare("SELECT COUNT(*) AS count FROM refunds WHERE order_id = ?").get("ord_demo_approve") as { count: number }).count,
+      (db.prepare("SELECT COUNT(*) AS count FROM refunds WHERE order_id = ?").get("ord_8901") as { count: number }).count,
       1,
     );
     assert.equal(
-      (db.prepare("SELECT refunded_cents FROM orders WHERE id = ?").get("ord_demo_approve") as { refunded_cents: number })
+      (db.prepare("SELECT refunded_cents FROM orders WHERE id = ?").get("ord_8901") as { refunded_cents: number })
         .refunded_cents,
       8900,
     );
@@ -61,7 +61,7 @@ test("same idempotency key cannot be reused for different money intent", () => {
   try {
     const base = {
       customerId: "cus_001",
-      orderId: "ord_demo_approve",
+      orderId: "ord_8901",
       itemId: "item_001",
       quantity: 1,
       reason: "CHANGED_MIND" as const,
@@ -89,7 +89,7 @@ test("final-sale execution is denied and never writes money movement", () => {
       idempotencyKey: "idem-deny-final-sale",
       request: {
         customerId: "cus_002",
-        orderId: "ord_demo_final_sale",
+        orderId: "ord_8902",
         itemId: "item_002",
         quantity: 1,
         reason: "CHANGED_MIND",
@@ -99,7 +99,7 @@ test("final-sale execution is denied and never writes money movement", () => {
     });
     assert.equal(result.status, "DENIED");
     assert.equal(
-      (db.prepare("SELECT COUNT(*) AS count FROM refunds WHERE order_id = ?").get("ord_demo_final_sale") as { count: number })
+      (db.prepare("SELECT COUNT(*) AS count FROM refunds WHERE order_id = ?").get("ord_8902") as { count: number })
         .count,
       0,
     );
@@ -115,7 +115,7 @@ test("item-level ledger prevents refunding more units than purchased", () => {
       idempotencyKey: "idem-partial-second-unit",
       request: {
         customerId: "cus_009",
-        orderId: "ord_demo_partial",
+        orderId: "ord_8906",
         itemId: "item_006",
         quantity: 2,
         reason: "CHANGED_MIND",
@@ -137,7 +137,7 @@ test("re-seeding fixtures never resets mutable refund totals", () => {
       idempotencyKey: "idem-seed-preserve",
       request: {
         customerId: "cus_001",
-        orderId: "ord_demo_approve",
+        orderId: "ord_8901",
         itemId: "item_001",
         quantity: 1,
         reason: "CHANGED_MIND",
@@ -146,10 +146,10 @@ test("re-seeding fixtures never resets mutable refund totals", () => {
       },
     });
 
-    seedDemoData(db);
+    seedCatalog(db);
 
     assert.equal(
-      (db.prepare("SELECT refunded_cents FROM orders WHERE id = ?").get("ord_demo_approve") as { refunded_cents: number })
+      (db.prepare("SELECT refunded_cents FROM orders WHERE id = ?").get("ord_8901") as { refunded_cents: number })
         .refunded_cents,
       8900,
     );

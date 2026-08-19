@@ -1,20 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import type { PersistedAgentEvent } from "@/domain/agent/types";
 import type { SupportMessage, SupportSessionDetail } from "@/domain/support/types";
-import { DEMO_SCENARIOS, parseDemoScenario, type DemoScenarioName } from "@/config/demo-scenarios";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ContextPanel } from "@/components/chat/ContextPanel";
 import { AgentActivityLog } from "@/components/chat/AgentActivityLog";
 import { RefundOutcomeCard } from "@/components/chat/RefundOutcomeCard";
-import { SupportSessionSetup } from "@/components/chat/SupportSessionSetup";
-import { SupportSetupPanel } from "@/components/chat/SupportSetupPanel";
-import type { SupportCustomerOption, SupportOrderOption } from "@/domain/support/context";
+import { HostedSupportGate } from "@/components/chat/HostedSupportGate";
+import { HostedSupportPanel } from "@/components/chat/HostedSupportPanel";
+import { SupportPortalGate } from "@/components/chat/SupportPortalGate";
+import { SupportPortalPanel } from "@/components/chat/SupportPortalPanel";
 import { useRealtimeTranscription } from "@/hooks/useRealtimeTranscription";
 import { readSseResponse } from "@/lib/sse-client";
 import { supportOutcomeFromEvent, type SupportOutcome } from "@/lib/support-outcome";
@@ -43,13 +42,17 @@ async function readResponseError(response: Response, fallback: string) {
   }
 }
 
+type SupportEntryState = { portal: boolean; host: boolean };
+type SupportSessionCreateResponse = SupportSessionDetail & { accessToken?: string };
+
 export default function SupportPage() {
   const router = useRouter();
   const bootstrapped = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const [detail, setDetail] = useState<SupportSessionDetail | null>(null);
-  const [scenario, setScenario] = useState<DemoScenarioName | null>(null);
+  const [entry, setEntry] = useState<SupportEntryState | null>(null);
+  const [sessionAccessToken, setSessionAccessToken] = useState<string | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [activity, setActivity] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<SupportOutcome | null>(null);
@@ -57,8 +60,6 @@ export default function SupportPage() {
   const [isStarting, setIsStarting] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [setupCustomer, setSetupCustomer] = useState<SupportCustomerOption | null>(null);
-  const [setupOrder, setSetupOrder] = useState<SupportOrderOption | null>(null);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [voicePlaybackError, setVoicePlaybackError] = useState<string | null>(null);
 
@@ -89,7 +90,10 @@ export default function SupportPage() {
     try {
       const response = await fetch("/api/voice/speech", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(sessionAccessToken ? { Authorization: `Bearer ${sessionAccessToken}` } : {}),
+        },
         body: JSON.stringify({ sessionId: message.sessionId, messageId: message.id }),
       });
       if (!response.ok) {
@@ -103,7 +107,6 @@ export default function SupportPage() {
       audioUrlRef.current = url;
       audio.onended = () => stopPlayback();
       audio.onerror = () => {
-        // Clearing src after a successful play also fires error; ignore that cleanup.
         if (!audioRef.current || audio.ended || audio.currentTime > 0) {
           stopPlayback();
           return;
@@ -121,9 +124,11 @@ export default function SupportPage() {
         setVoicePlaybackError(messageText);
       }
     }
-  }, [stopPlayback]);
+  }, [sessionAccessToken, stopPlayback]);
 
-  const initializeSession = useCallback(async (input: { customerId: string; orderId: string }) => {
+  const initializeSession = useCallback(async (
+    input: { email: string; orderId: string } | { launchToken: string },
+  ) => {
     setIsStarting(true);
     setError(null);
     setOutcome(null);
@@ -137,10 +142,15 @@ export default function SupportPage() {
       if (!response.ok) {
         throw new Error(await readResponseError(response, "Unable to create the support session."));
       }
-      const created = (await response.json()) as SupportSessionDetail;
-      setDetail(created);
-      setMessages(created.messages);
-      return created;
+      const created = (await response.json()) as SupportSessionCreateResponse;
+      const { accessToken, ...sessionDetail } = created;
+      if (typeof accessToken !== "string" || !accessToken) {
+        throw new Error("Support session authorization is required.");
+      }
+      setSessionAccessToken(accessToken);
+      setDetail(sessionDetail);
+      setMessages(sessionDetail.messages);
+      return sessionDetail;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to initialize support chat.");
       return null;
@@ -153,34 +163,38 @@ export default function SupportPage() {
     if (bootstrapped.current) return;
     bootstrapped.current = true;
 
-    const requestedScenario = parseDemoScenario(new URLSearchParams(window.location.search).get("scenario"));
-    if (!requestedScenario) return;
+    void (async () => {
+      try {
+        const modeResponse = await fetch("/api/support/access-mode", { cache: "no-store" });
+        if (!modeResponse.ok) throw new Error("Unable to determine the support entry mode.");
+        const modePayload = (await modeResponse.json()) as { portal?: unknown; host?: unknown };
+        const nextEntry = {
+          portal: modePayload.portal !== false,
+          host: modePayload.host !== false,
+        };
+        setEntry(nextEntry);
 
-    const config = DEMO_SCENARIOS[requestedScenario];
-    setScenario(requestedScenario);
-    void initializeSession({ customerId: config.customerId, orderId: config.orderId });
+        const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const launchToken = fragment.get("launch")?.trim() ?? "";
+        if (window.location.hash) window.history.replaceState(null, "", "/support");
+        if (launchToken) await initializeSession({ launchToken });
+      } catch (caught) {
+        setEntry({ portal: false, host: true });
+        setError(caught instanceof Error ? caught.message : "Unable to initialize support.");
+      }
+    })();
   }, [initializeSession]);
 
   const refreshSession = async (sessionId: string) => {
-    const response = await fetch(`/api/support/sessions/${encodeURIComponent(sessionId)}`, { cache: "no-store" });
+    const response = await fetch(`/api/support/sessions/${encodeURIComponent(sessionId)}`, {
+      cache: "no-store",
+      headers: sessionAccessToken ? { Authorization: `Bearer ${sessionAccessToken}` } : undefined,
+    });
     if (!response.ok) return;
     const refreshed = (await response.json()) as SupportSessionDetail;
     setDetail(refreshed);
     setMessages(refreshed.messages);
   };
-
-  const handleManualStart = async (input: { customerId: string; orderId: string }) => {
-    setScenario(null);
-    await initializeSession(input);
-  };
-
-  const handleSelectionChange = useCallback((selection: {
-    customer: SupportCustomerOption | null;
-    order: SupportOrderOption | null;
-  }) => {
-    setSetupCustomer(selection.customer);
-    setSetupOrder(selection.order);
-  }, []);
 
   const handleSend = async (content: string, options?: { speakResponse?: boolean }) => {
     if (!detail || isSending) return;
@@ -202,14 +216,15 @@ export default function SupportPage() {
     let assistantMessageForVoice: SupportMessage | null = null;
 
     try {
-      const demoFailure = scenario ? DEMO_SCENARIOS[scenario].demoFailure : false;
       const response = await fetch("/api/support/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(sessionAccessToken ? { Authorization: `Bearer ${sessionAccessToken}` } : {}),
+        },
         body: JSON.stringify({
           sessionId: detail.session.id,
           message: content,
-          ...(demoFailure ? { demoFailure: "LOOKUP_ORDER_ONCE" } : {}),
         }),
       });
 
@@ -257,6 +272,7 @@ export default function SupportPage() {
 
   const voice = useRealtimeTranscription({
     sessionId: detail?.session.id ?? null,
+    accessToken: sessionAccessToken,
     disabled: isSending || !detail,
     onFinalTranscript: async (transcript) => {
       await handleSend(transcript, { speakResponse: true });
@@ -267,23 +283,25 @@ export default function SupportPage() {
     voice.stop();
     stopPlayback();
     setDetail(null);
-    setScenario(null);
+    setSessionAccessToken(null);
     setMessages([]);
     setActivity(null);
     setOutcome(null);
     setCurrentRunId(null);
     setError(null);
     setVoicePlaybackError(null);
-    setSetupCustomer(null);
-    setSetupOrder(null);
     router.replace("/support", { scroll: false });
   };
 
   const sessionSubtitle = detail
-    ? `${scenario ? `${DEMO_SCENARIOS[scenario].label} demo · ` : ""}${detail.customer.name} · Order ${detail.order.id}`
-    : scenario && isStarting
-      ? `Preparing ${DEMO_SCENARIOS[scenario].label.toLowerCase()} demo…`
-      : "Choose a CRM customer and owned order to begin.";
+    ? `${detail.customer.name} · Order ${detail.order.id}`
+    : isStarting
+      ? "Opening a secure support session…"
+      : entry?.portal
+        ? "Look up an order to begin."
+        : entry === null
+          ? "Preparing support…"
+          : "Open support from your order.";
 
   const supportStatus = voice.isActive
     ? voice.state === "CONNECTING" ? "Voice connecting" : "Listening"
@@ -291,7 +309,9 @@ export default function SupportPage() {
       ? "Working"
       : isStarting
         ? "Starting"
-        : "Ready";
+        : entry === null
+          ? "Loading"
+          : "Ready";
 
   return (
     <div className={styles.layout}>
@@ -313,10 +333,6 @@ export default function SupportPage() {
                 <RotateCcw size={14} /> New session
               </button>
             ) : null}
-            <Link href={currentRunId ? `/admin/runs?run=${encodeURIComponent(currentRunId)}` : "/admin"} className={styles.adminLink}>
-              <LayoutDashboard size={15} />
-              {currentRunId ? "View run" : "Admin"}
-            </Link>
           </div>
         </header>
 
@@ -339,19 +355,19 @@ export default function SupportPage() {
                 <div className={styles.errorNotice} role="alert">
                   <strong>Request could not be completed</strong>
                   <span>{error}</span>
-                  {currentRunId ? (
-                    <Link href={`/admin/runs?run=${encodeURIComponent(currentRunId)}`}>Check the run before trying again</Link>
-                  ) : null}
                 </div>
               ) : null}
             </div>
-          ) : (
-            <SupportSessionSetup
-              onStart={handleManualStart}
-              onSelectionChange={handleSelectionChange}
+          ) : entry?.portal ? (
+            <SupportPortalGate
+              onStart={(input) => initializeSession(input).then(() => undefined)}
               isStarting={isStarting}
               sessionError={error}
             />
+          ) : entry === null ? (
+            <div className={styles.accessLoading} role="status">Preparing support…</div>
+          ) : (
+            <HostedSupportGate error={error} />
           )}
         </main>
 
@@ -369,7 +385,7 @@ export default function SupportPage() {
               />
               {voicePlaybackError ? <p className={styles.voicePlaybackError} role="status">{voicePlaybackError}</p> : null}
               <p className={styles.hint}>
-                Voice responses are AI-generated. Microphone turns are transcribed with OpenAI Realtime, then sent through the same server-side refund agent and deterministic policy as typed messages.
+                Voice responses are AI-generated. Microphone turns are transcribed, then sent through the same refund agent and policy as typed messages.
               </p>
             </div>
           </div>
@@ -379,8 +395,10 @@ export default function SupportPage() {
       <aside className={styles.contextArea}>
         {detail ? (
           <ContextPanel customer={detail.customer} order={detail.order} />
+        ) : entry?.portal ? (
+          <SupportPortalPanel />
         ) : (
-          <SupportSetupPanel customer={setupCustomer} order={setupOrder} />
+          <HostedSupportPanel />
         )}
       </aside>
     </div>

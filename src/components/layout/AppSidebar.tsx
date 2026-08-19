@@ -1,13 +1,42 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Activity, Bot, FileText, LayoutDashboard, MessageSquare, Receipt, Users } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Activity, Bot, FileText, LayoutDashboard, LogOut, MessageSquare, Receipt, ServerCog, UserRoundCheck, Users } from "lucide-react";
 import clsx from "clsx";
 import styles from "./AppSidebar.module.css";
 
+const PUBLIC_PATHS = ["/", "/support", "/login", "/privacy", "/terms"];
+
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [email, setEmail] = useState<string | null>(null);
+
+  const publicSurface = PUBLIC_PATHS.some((path) => pathname === path || (path !== "/" && pathname.startsWith(`${path}/`)));
+
+  useEffect(() => {
+    if (publicSurface) return;
+    let active = true;
+    void fetch("/api/admin/login", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { email?: unknown } | null) => {
+        if (active && typeof payload?.email === "string") setEmail(payload.email);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [publicSurface]);
+
+  if (publicSurface) return null;
+
+  async function signOut() {
+    await fetch("/api/admin/login", { method: "DELETE" });
+    router.replace("/login");
+    router.refresh();
+  }
 
   return (
     <aside className={styles.sidebar}>
@@ -17,7 +46,7 @@ export function AppSidebar() {
             <Bot size={18} />
           </div>
           <div>
-            <span className={styles.logoText}>Jobform Automator</span>
+            <span className={styles.logoText}>Jobform</span>
             <span className={styles.logoSub}>Support operations</span>
           </div>
         </div>
@@ -25,15 +54,15 @@ export function AppSidebar() {
 
       <nav className={styles.nav}>
         <div className={styles.navSection}>
-          <p className={styles.sectionLabel}>Support</p>
+          <p className={styles.sectionLabel}>Workspace</p>
           <Link href="/support" className={clsx(styles.navItem, pathname.startsWith("/support") && styles.navItemActive)}>
             <MessageSquare size={16} />
-            Support Chat
+            Customer portal
           </Link>
         </div>
 
         <div className={styles.navSection}>
-          <p className={styles.sectionLabel}>Admin</p>
+          <p className={styles.sectionLabel}>Operations</p>
           <Link href="/admin" className={clsx(styles.navItem, pathname === "/admin" && styles.navItemActive)}>
             <LayoutDashboard size={16} />
             Overview
@@ -50,21 +79,33 @@ export function AppSidebar() {
             <Receipt size={16} />
             Refunds Ledger
           </Link>
+          <Link href="/admin/escalations" className={clsx(styles.navItem, pathname.startsWith("/admin/escalations") && styles.navItemActive)}>
+            <UserRoundCheck size={16} />
+            Escalations
+          </Link>
           <Link href="/admin/policy" className={clsx(styles.navItem, pathname.startsWith("/admin/policy") && styles.navItemActive)}>
             <FileText size={16} />
             Refund Policy
+          </Link>
+          <Link href="/admin/system" className={clsx(styles.navItem, pathname.startsWith("/admin/system") && styles.navItemActive)}>
+            <ServerCog size={16} />
+            System
           </Link>
         </div>
       </nav>
 
       <div className={styles.footer}>
         <div className={styles.user}>
-          <div className={styles.avatar}>AU</div>
+          <div className={styles.avatar}>{(email ?? "ST").slice(0, 2).toUpperCase()}</div>
           <div className={styles.userInfo}>
-            <span className={styles.userName}>Admin User</span>
-            <span className={styles.userRole}>Workspace Owner</span>
+            <span className={styles.userName}>{email ?? "Staff"}</span>
+            <span className={styles.userRole}>Operations</span>
           </div>
         </div>
+        <button type="button" className={styles.navItem} onClick={() => void signOut()}>
+          <LogOut size={16} />
+          Sign out
+        </button>
       </div>
     </aside>
   );

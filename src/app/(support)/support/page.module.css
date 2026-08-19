@@ -245,3 +245,15 @@
   text-align: center;
   line-height: 1.4;
 }
+
+.accessLoading {
+  width: min(680px, 100%);
+  margin: 32px auto;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: rgba(255, 252, 248, 0.72);
+  color: var(--muted-strong);
+  text-align: center;
+  font-weight: 650;
+}

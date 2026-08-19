@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDatabase } from "@/db/database";
-import { seedDemoData } from "@/db/seed";
+import { seedCatalog } from "@/db/seed";
 import { OpenAIVoiceClient } from "@/integrations/openai/openai-voice.client";
 import { parseRealtimeTranscriptionEvent } from "@/lib/realtime-transcription";
 import { SupportSessionRepository } from "@/repositories/support-session.repository";
@@ -15,8 +15,8 @@ import {
 
 test("voice credential is a short-lived transcription-only Realtime session and never a second refund agent", async () => {
   const db = createDatabase(":memory:");
-  seedDemoData(db);
-  const support = await createSupportSession(db, { customerId: "cus_001", orderId: "ord_demo_approve" });
+  seedCatalog(db);
+  const support = await createSupportSession(db, { customerId: "cus_001", orderId: "ord_8901" });
   let requestUrl = "";
   let requestAuthorization = "";
   let safetyIdentifier = "";
@@ -55,7 +55,7 @@ test("voice credential is a short-lived transcription-only Realtime session and 
     const transcription = audio.input?.transcription as { model?: string; language?: string; prompt?: string };
     assert.equal(transcription.model, "gpt-4o-mini-transcribe");
     assert.equal(transcription.language, "en");
-    assert.match(String(transcription.prompt), /ord_demo_approve/);
+    assert.match(String(transcription.prompt), /ord_8901/);
     assert.match(String(transcription.prompt), /Studio Headphones/);
   } finally {
     db.close();
@@ -64,10 +64,10 @@ test("voice credential is a short-lived transcription-only Realtime session and 
 
 test("voice playback accepts only persisted agent messages bound to the same support session", async () => {
   const db = createDatabase(":memory:");
-  seedDemoData(db);
+  seedCatalog(db);
   try {
-    const first = await createSupportSession(db, { customerId: "cus_001", orderId: "ord_demo_approve" });
-    const second = await createSupportSession(db, { customerId: "cus_002", orderId: "ord_demo_final_sale" });
+    const first = await createSupportSession(db, { customerId: "cus_001", orderId: "ord_8901" });
+    const second = await createSupportSession(db, { customerId: "cus_002", orderId: "ord_8902" });
     const sessions = new SupportSessionRepository(db);
     const customerMessage = sessions.appendMessage({
       sessionId: first.session.id,

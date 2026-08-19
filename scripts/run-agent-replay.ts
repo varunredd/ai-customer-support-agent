@@ -1,6 +1,6 @@
 import "./load-env";
 import { createDatabase } from "@/db/database";
-import { seedDemoData } from "@/db/seed";
+import { seedCatalog } from "@/db/seed";
 import { OpenAIResponsesClient } from "@/integrations/openai/openai-responses.client";
 import { AgentRunRepository } from "@/repositories/agent-run.repository";
 import { runSupportAgent } from "@/services/agent/support-agent.service";
@@ -9,30 +9,30 @@ async function main() {
   const scenario = process.argv[2] ?? "approve";
   const filename = process.env.DATABASE_PATH?.trim() || ".data/jobform-support.sqlite";
   const db = createDatabase(filename);
-  seedDemoData(db);
+  seedCatalog(db);
   const model = new OpenAIResponsesClient();
 
   const scenarios = {
     approve: {
       customerEmail: "maya@example.com",
-      message: "Please refund order ord_demo_approve. I changed my mind. The Studio Headphones are unopened and I want to return quantity 1.",
+      message: "Please refund order ord_8901. I changed my mind. The Studio Headphones are unopened and I want to return quantity 1.",
       failOnceTool: undefined,
     },
     deny: {
       customerEmail: "noah@example.com",
-      message: "Please refund order ord_demo_final_sale. I changed my mind. The Limited Edition Tee is unopened and I want to return quantity 1.",
+      message: "Please refund order ord_8902. I changed my mind. The Limited Edition Tee is unopened and I want to return quantity 1.",
       failOnceTool: undefined,
     },
     retry: {
       customerEmail: "maya@example.com",
-      message: "Please refund order ord_demo_approve. I changed my mind. The Studio Headphones are unopened and I want to return quantity 1.",
+      message: "Please refund order ord_8901. I changed my mind. The Studio Headphones are unopened and I want to return quantity 1.",
       failOnceTool: "lookup_order",
     },
   } as const;
 
   const selected = scenarios[scenario as keyof typeof scenarios];
   if (!selected) {
-    console.error("Usage: npm run demo:agent -- approve|deny|retry");
+    console.error("Usage: npm run agent:replay -- approve|deny|retry");
     process.exitCode = 1;
     db.close();
     return;

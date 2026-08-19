@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDatabase } from "@/db/database";
-import { seedDemoData } from "@/db/seed";
+import { seedCatalog } from "@/db/seed";
 import type { PersistedAgentEvent } from "@/domain/agent/types";
 import { supportOutcomeFromEvent } from "@/lib/support-outcome";
 import {
@@ -25,16 +25,16 @@ function event(input: Partial<PersistedAgentEvent> & Pick<PersistedAgentEvent, "
   };
 }
 
-test("support product context lists CRM customers and only customer-owned orders", async () => {
+test("catalog context lists customers and only customer-owned orders", async () => {
   const db = createDatabase(":memory:");
-  seedDemoData(db);
+  seedCatalog(db);
   try {
     const customers = await listSupportCustomers(db);
     assert.equal(customers.length, 15);
     assert.equal(customers.find((customer) => customer.id === "cus_001")?.name, "Maya Patel");
 
     const mayaOrders = await listSupportOrdersForCustomer(db, "cus_001");
-    assert.deepEqual(mayaOrders.map((order) => order.id), ["ord_demo_approve"]);
+    assert.deepEqual(mayaOrders.map((order) => order.id), ["ord_8901"]);
     assert.deepEqual(mayaOrders[0]?.itemNames, ["Studio Headphones"]);
 
     const customerWithoutSeededOrders = await listSupportOrdersForCustomer(db, "cus_015");

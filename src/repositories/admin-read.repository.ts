@@ -13,6 +13,7 @@ export interface AdminRefundListItem {
   amountCents: number;
   currency: "USD";
   status: "COMPLETED";
+  policyVersion: string | null;
   createdAt: string;
 }
 
@@ -43,6 +44,7 @@ interface RefundRow {
   amount_cents: number;
   currency: "USD";
   status: "COMPLETED";
+  policy_version: string | null;
   created_at: string;
 }
 
@@ -82,7 +84,7 @@ export class AdminReadRepository {
     const rows = this.db
       .prepare(
         `SELECT r.id, r.run_id, r.customer_id, c.name AS customer_name, r.order_id, r.item_id,
-                i.name AS item_name, r.quantity, r.amount_cents, r.currency, r.status, r.created_at
+                i.name AS item_name, r.quantity, r.amount_cents, r.currency, r.status, r.policy_version, r.created_at
          FROM refunds r
          JOIN customers c ON c.id = r.customer_id
          JOIN order_items i ON i.id = r.item_id
@@ -103,6 +105,7 @@ export class AdminReadRepository {
       amountCents: row.amount_cents,
       currency: row.currency,
       status: row.status,
+      policyVersion: row.policy_version,
       createdAt: row.created_at,
     }));
   }

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { MIGRATIONS, MIGRATION_TABLE_SQL } from "@/db/schema";
+import { seedCatalog } from "@/db/seed";
 
 export type AppDatabase = Database.Database;
 
@@ -50,6 +51,12 @@ export function getDatabase(): AppDatabase {
   if (!singleton) {
     const filename = process.env.DATABASE_PATH?.trim() || ".data/jobform-support.sqlite";
     singleton = createDatabase(filename);
+    const customerCount = (singleton.prepare("SELECT COUNT(*) AS count FROM customers").get() as { count: number }).count;
+    if (customerCount === 0) {
+      const configured = process.env.SEED_SAMPLE_CATALOG?.trim().toLowerCase();
+      const allowSeed = configured === "true" || (configured !== "false" && process.env.NODE_ENV !== "production");
+      if (allowSeed) seedCatalog(singleton);
+    }
   }
   return singleton;
 }

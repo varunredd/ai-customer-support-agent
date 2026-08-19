@@ -50,15 +50,15 @@ function mapMessage(row: SupportMessageRow): SupportMessage {
 export class SupportSessionRepository {
   constructor(private readonly db: AppDatabase) {}
 
-  create(input: { customerId: string; orderId: string; id?: string; createdAt?: string }): SupportSession {
+  create(input: { customerId: string; orderId: string; accessTokenHash?: string | null; id?: string; createdAt?: string }): SupportSession {
     const id = input.id ?? `ses_${randomUUID()}`;
     const now = input.createdAt ?? new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO support_sessions (id, customer_id, order_id, status, created_at, updated_at)
-         VALUES (?, ?, ?, 'OPEN', ?, ?)`,
+        `INSERT INTO support_sessions (id, customer_id, order_id, status, access_token_hash, created_at, updated_at)
+         VALUES (?, ?, ?, 'OPEN', ?, ?, ?)`,
       )
-      .run(id, input.customerId, input.orderId, now, now);
+      .run(id, input.customerId, input.orderId, input.accessTokenHash ?? null, now, now);
 
     return this.findById(id)!;
   }

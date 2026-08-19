@@ -14,6 +14,7 @@ export type AgentEventType =
   | "POLICY_CHECK"
   | "DECISION"
   | "REFUND_EXECUTION"
+  | "ESCALATION"
   | "RUN_COMPLETED"
   | "RUN_FAILED";
 

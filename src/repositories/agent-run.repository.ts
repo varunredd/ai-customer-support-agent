@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AppDatabase } from "@/db/database";
+import { redactMetadata } from "@/lib/security/redaction";
 import type {
   AgentEventStatus,
   AgentEventType,
@@ -123,7 +124,7 @@ export class AgentRunRepository {
           input.toolName ?? null,
           input.callId ?? null,
           input.durationMs ?? null,
-          input.metadata ? JSON.stringify(input.metadata) : null,
+          input.metadata ? JSON.stringify(redactMetadata(input.metadata)) : null,
           input.createdAt ?? new Date().toISOString(),
         );
       return id;

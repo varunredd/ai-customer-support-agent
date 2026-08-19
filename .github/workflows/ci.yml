@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "development", "phase-6-submission-hardening"]
+    branches: ["main", "development", "production-p0-launch-foundation"]
   pull_request:
 
 permissions:
@@ -26,11 +26,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Audit tracked submission files
-        run: npm run submission:audit
+      - name: Audit tracked source files
+        run: npm run source:audit
 
-      - name: Reset deterministic demo state
-        run: npm run demo:reset
+      - name: Reset sample catalog
+        run: npm run db:bootstrap
 
       - name: Typecheck, test, and production build
         run: npm run verify

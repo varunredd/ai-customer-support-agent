@@ -20,7 +20,7 @@ const order = (id: string) => {
 function request(overrides: Partial<RefundRequest> = {}): RefundRequest {
   return {
     customerId: "cus_001",
-    orderId: "ord_demo_approve",
+    orderId: "ord_8901",
     itemId: "item_001",
     quantity: 1,
     reason: "CHANGED_MIND",
@@ -31,7 +31,7 @@ function request(overrides: Partial<RefundRequest> = {}): RefundRequest {
 }
 
 test("approves a standard eligible refund and refunds item price only", () => {
-  const result = evaluateRefundEligibility(customer("cus_001"), order("ord_demo_approve"), request());
+  const result = evaluateRefundEligibility(customer("cus_001"), order("ord_8901"), request());
   assert.equal(result.decision, "APPROVE");
   assert.equal(result.refundAmountCents, 8900);
   assert.deepEqual(result.denialReasons, []);
@@ -40,8 +40,8 @@ test("approves a standard eligible refund and refunds item price only", () => {
 test("denies a final-sale item", () => {
   const result = evaluateRefundEligibility(
     customer("cus_002"),
-    order("ord_demo_final_sale"),
-    request({ customerId: "cus_002", orderId: "ord_demo_final_sale", itemId: "item_002" }),
+    order("ord_8902"),
+    request({ customerId: "cus_002", orderId: "ord_8902", itemId: "item_002" }),
   );
   assert.equal(result.decision, "DENY");
   assert.ok(result.denialReasons.some((reason) => reason.startsWith("NOT_FINAL_SALE")));
@@ -50,8 +50,8 @@ test("denies a final-sale item", () => {
 test("denies an out-of-window refund", () => {
   const result = evaluateRefundEligibility(
     customer("cus_003"),
-    order("ord_demo_expired"),
-    request({ customerId: "cus_003", orderId: "ord_demo_expired", itemId: "item_003" }),
+    order("ord_8903"),
+    request({ customerId: "cus_003", orderId: "ord_8903", itemId: "item_003" }),
   );
   assert.equal(result.decision, "DENY");
   assert.ok(result.denialReasons.some((reason) => reason.startsWith("WITHIN_WINDOW")));
@@ -60,8 +60,8 @@ test("denies an out-of-window refund", () => {
 test("denies used merchandise for a changed-mind request", () => {
   const result = evaluateRefundEligibility(
     customer("cus_004"),
-    order("ord_demo_used"),
-    request({ customerId: "cus_004", orderId: "ord_demo_used", itemId: "item_004", condition: "USED" }),
+    order("ord_8904"),
+    request({ customerId: "cus_004", orderId: "ord_8904", itemId: "item_004", condition: "USED" }),
   );
   assert.equal(result.decision, "DENY");
   assert.ok(result.denialReasons.some((reason) => reason.startsWith("CONDITION_ALLOWED")));
@@ -70,15 +70,15 @@ test("denies used merchandise for a changed-mind request", () => {
 test("denies automated refund for a high-risk account", () => {
   const result = evaluateRefundEligibility(
     customer("cus_006"),
-    order("ord_demo_high_risk"),
-    request({ customerId: "cus_006", orderId: "ord_demo_high_risk", itemId: "item_005" }),
+    order("ord_8905"),
+    request({ customerId: "cus_006", orderId: "ord_8905", itemId: "item_005" }),
   );
   assert.equal(result.decision, "DENY");
   assert.ok(result.denialReasons.some((reason) => reason.startsWith("RISK_NOT_HIGH")));
 });
 
 test("prevents refund quantity from exceeding purchased quantity", () => {
-  const result = evaluateRefundEligibility(customer("cus_001"), order("ord_demo_approve"), request({ quantity: 2 }));
+  const result = evaluateRefundEligibility(customer("cus_001"), order("ord_8901"), request({ quantity: 2 }));
   assert.equal(result.decision, "DENY");
   assert.ok(result.denialReasons.some((reason) => reason.startsWith("VALID_QUANTITY")));
 });

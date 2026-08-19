@@ -22,6 +22,7 @@ interface RefundRow {
   amountCents: number;
   currency: "USD";
   status: "COMPLETED";
+  policyVersion: string | null;
   createdAt: string;
 }
 
@@ -87,6 +88,7 @@ export default function RefundsLedgerPage() {
                     <th>Item</th>
                     <th>Amount</th>
                     <th>Status</th>
+                    <th>Policy</th>
                     <th>Processed</th>
                     <th>Run</th>
                   </tr>
@@ -101,6 +103,7 @@ export default function RefundsLedgerPage() {
                         <td>{refund.itemName} · Qty {refund.quantity}</td>
                         <td className="text-strong">{formatMoney(refund.amountCents)}</td>
                         <td><StatusBadge status="SUCCESS">COMPLETED</StatusBadge></td>
+                        <td className="mono">{refund.policyVersion ?? "legacy"}</td>
                         <td>{formatTime(refund.createdAt)}</td>
                         <td>
                           {refund.runId ? (

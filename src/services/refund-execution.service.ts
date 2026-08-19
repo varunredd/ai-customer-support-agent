@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import type { AppDatabase } from "@/db/database";
 import type { ExecuteRefundInput, ExecuteRefundResult, RefundRecord } from "@/domain/refunds/execution";
 import type { Customer, Order, OrderItem, RefundEvaluation, RefundRequest } from "@/domain/refunds/types";
+import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
+import { NotificationOutboxRepository } from "@/repositories/notification-outbox.repository";
 import { evaluateRefundEligibility } from "@/services/refund-eligibility.service";
 
 interface ExistingRefundRow {
@@ -18,6 +20,7 @@ interface ExistingRefundRow {
   amount_cents: number;
   currency: "USD";
   status: "COMPLETED";
+  policy_version: string | null;
   evaluation_json: string;
   created_at: string;
 }
@@ -102,6 +105,7 @@ function mapExistingRefund(row: ExistingRefundRow): RefundRecord {
     amountCents: row.amount_cents,
     currency: row.currency,
     status: row.status,
+    policyVersion: row.policy_version,
     createdAt: row.created_at,
   };
 }
@@ -220,7 +224,9 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
             deliveredAt: null,
             items: [],
           };
-      const evaluation = evaluateRefundEligibility(fallbackCustomer, fallbackOrder, input.request);
+      const evaluation = evaluateRefundEligibility(fallbackCustomer, fallbackOrder, input.request, {
+        policy: new RefundPolicyRepository(db).getActive(),
+      });
       return { status: "DENIED", idempotentReplay: false, refund: null, evaluation };
     }
 
@@ -230,8 +236,10 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
 
     const customer = mapCustomer(customerRow);
     const order = loadOrder(db, orderRow);
+    const policy = new RefundPolicyRepository(db).getActive();
     const evaluation = evaluateRefundEligibility(customer, order, input.request, {
       alreadyRefundedItemQuantity: alreadyRefunded.quantity,
+      policy,
     });
 
     if (evaluation.decision !== "APPROVE") {
@@ -243,8 +251,8 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
     db.prepare(`
       INSERT INTO refunds (
         id, idempotency_key, request_fingerprint, run_id, customer_id, order_id, item_id,
-        quantity, reason, condition, amount_cents, currency, status, evaluation_json, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'USD', 'COMPLETED', ?, ?)
+        quantity, reason, condition, amount_cents, currency, status, policy_version, evaluation_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'USD', 'COMPLETED', ?, ?, ?)
     `).run(
       refundId,
       input.idempotencyKey,
@@ -257,6 +265,7 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
       input.request.reason,
       input.request.condition,
       evaluation.refundAmountCents,
+      policy.version,
       JSON.stringify(evaluation),
       now,
     );
@@ -268,6 +277,20 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
     db.prepare("UPDATE customers SET lifetime_refunds = lifetime_refunds + 1 WHERE id = ?").run(
       input.request.customerId,
     );
+
+    new NotificationOutboxRepository(db).enqueue({
+      eventKey: `refund-completed:${refundId}`,
+      eventType: "REFUND_COMPLETED",
+      recipient: customer.email,
+      subject: `Refund confirmed for order ${input.request.orderId}`,
+      payload: {
+        refundId,
+        orderId: input.request.orderId,
+        amountCents: evaluation.refundAmountCents,
+        currency: "USD",
+        policyVersion: policy.version,
+      },
+    });
 
     const row = db.prepare("SELECT * FROM refunds WHERE id = ?").get(refundId) as ExistingRefundRow;
     return {

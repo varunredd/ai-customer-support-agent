@@ -135,6 +135,116 @@ export const MIGRATIONS: DatabaseMigration[] = [
       CREATE INDEX idx_support_messages_run_id ON support_messages(run_id);
     `,
   },
+
+  {
+    version: 3,
+    name: "production_foundation",
+    sql: `
+      ALTER TABLE refunds ADD COLUMN policy_version TEXT;
+      ALTER TABLE support_sessions ADD COLUMN access_token_hash TEXT;
+
+      CREATE TABLE support_launch_tokens (
+        jti TEXT PRIMARY KEY,
+        customer_id TEXT NOT NULL,
+        order_id TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        consumed_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_support_launch_tokens_consumed_at
+        ON support_launch_tokens(consumed_at DESC);
+
+      CREATE TABLE refund_policy_versions (
+        id TEXT PRIMARY KEY,
+        version TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL CHECK (status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')),
+        refund_window_days INTEGER NOT NULL CHECK (refund_window_days > 0 AND refund_window_days <= 365),
+        rules_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        published_at TEXT
+      );
+
+      CREATE UNIQUE INDEX idx_refund_policy_single_active
+        ON refund_policy_versions(status) WHERE status = 'ACTIVE';
+
+      CREATE TABLE notification_outbox (
+        id TEXT PRIMARY KEY,
+        event_key TEXT NOT NULL UNIQUE,
+        event_type TEXT NOT NULL,
+        recipient TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('PENDING', 'SENT', 'DEAD')),
+        attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+        next_attempt_at TEXT NOT NULL,
+        provider_message_id TEXT,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        sent_at TEXT
+      );
+
+      CREATE INDEX idx_notification_outbox_dispatch
+        ON notification_outbox(status, next_attempt_at, created_at);
+
+      CREATE TABLE support_escalations (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL UNIQUE REFERENCES agent_runs(id) ON DELETE CASCADE,
+        customer_id TEXT NOT NULL REFERENCES customers(id),
+        order_id TEXT REFERENCES orders(id),
+        reason_code TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        priority TEXT NOT NULL CHECK (priority IN ('NORMAL', 'HIGH')),
+        status TEXT NOT NULL CHECK (status IN ('OPEN', 'RESOLVED')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_support_escalations_status
+        ON support_escalations(status, created_at DESC);
+
+      CREATE TABLE operational_events (
+        id TEXT PRIMARY KEY,
+        severity TEXT NOT NULL CHECK (severity IN ('INFO', 'WARN', 'ERROR')),
+        source TEXT NOT NULL,
+        code TEXT NOT NULL,
+        message TEXT NOT NULL,
+        request_id TEXT,
+        run_id TEXT REFERENCES agent_runs(id),
+        metadata_json TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_operational_events_created_at
+        ON operational_events(created_at DESC);
+      CREATE INDEX idx_operational_events_severity
+        ON operational_events(severity, created_at DESC);
+
+      CREATE TABLE integration_events (
+        id TEXT PRIMARY KEY,
+        source TEXT NOT NULL,
+        external_event_id TEXT NOT NULL UNIQUE,
+        payload_hash TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('PROCESSED', 'REJECTED')),
+        error_code TEXT,
+        created_at TEXT NOT NULL,
+        processed_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_integration_events_created_at
+        ON integration_events(created_at DESC);
+
+      CREATE TABLE request_rate_limits (
+        bucket_key TEXT PRIMARY KEY,
+        window_started_at_ms INTEGER NOT NULL,
+        request_count INTEGER NOT NULL CHECK (request_count >= 0),
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_request_rate_limits_updated_at
+        ON request_rate_limits(updated_at);
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.at(-1)?.version ?? 0;

@@ -1,6 +1,8 @@
 import { getDatabase } from "@/db/database";
 import { OpenAIVoiceError } from "@/integrations/openai/openai-voice.client";
 import { asObject, jsonError, readNonEmptyString } from "@/lib/http";
+import { assertSupportSessionAccess, SupportAccessError } from "@/security/support-access";
+import { consumeRateLimit, RateLimitExceededError } from "@/security/rate-limit";
 import {
   createVoiceTranscriptionCredential,
   VoiceSessionClosedError,
@@ -20,9 +22,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    const credential = await createVoiceTranscriptionCredential(getDatabase(), sessionId);
+    const db = getDatabase();
+    assertSupportSessionAccess(db, sessionId, request);
+    consumeRateLimit(db, { key: `voice-credential:${sessionId}`, limit: 12, windowMs: 60_000 });
+    const credential = await createVoiceTranscriptionCredential(db, sessionId);
     return Response.json({ value: credential.value, expiresAt: credential.expiresAt }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (error instanceof RateLimitExceededError) {
+      return Response.json(
+        { error: { code: error.code, message: "Too many voice requests. Please wait before trying again." } },
+        { status: 429, headers: { "Retry-After": String(error.retryAfterSeconds) } },
+      );
+    }
+    if (error instanceof SupportAccessError) return jsonError(error.code === "SUPPORT_SESSION_NOT_FOUND" ? 404 : 401, error.code, error.message);
     if (error instanceof SupportSessionNotFoundError) return jsonError(404, error.code, error.message);
     if (error instanceof VoiceSessionClosedError) return jsonError(409, error.code, error.message);
     if (error instanceof OpenAIVoiceError) {

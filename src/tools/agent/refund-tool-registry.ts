@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import type { AppDatabase } from "@/db/database";
-import { REFUND_POLICY } from "@/domain/refunds/policy";
 import type { ItemCondition, RefundReason, RefundRequest } from "@/domain/refunds/types";
+import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
+import { SupportEscalationRepository } from "@/repositories/support-escalation.repository";
 import { createSqliteCustomerRepository, createSqliteOrderRepository } from "@/repositories/sqlite";
 import { evaluateRefundEligibility } from "@/services/refund-eligibility.service";
 import { executeRefundAtomically } from "@/services/refund-execution.service";
@@ -17,6 +18,7 @@ import {
 
 const REFUND_REASONS = ["CHANGED_MIND", "DAMAGED", "WRONG_ITEM", "NOT_AS_DESCRIBED", "LATE_DELIVERY"] as const;
 const ITEM_CONDITIONS = ["UNOPENED", "OPENED", "USED", "DAMAGED"] as const;
+const ESCALATION_REASONS = ["HIGH_RISK", "POLICY_EXCEPTION", "TOOL_FAILURE", "CUSTOMER_REQUEST", "OTHER"] as const;
 
 export interface CreateRefundToolRegistryOptions {
   failOnceTool?: string;
@@ -76,6 +78,7 @@ function buildAgentIdempotencyKey(runId: string, request: RefundRequest) {
 export function createRefundToolRegistry(db: AppDatabase, options: CreateRefundToolRegistryOptions = {}) {
   const customerRepository = createSqliteCustomerRepository(db);
   const orderRepository = createSqliteOrderRepository(db);
+  const policyRepository = new RefundPolicyRepository(db);
   const authenticatedEmail = options.authenticatedCustomerEmail?.trim().toLowerCase() || null;
   const requestTimestamp = normalizeTimestamp(options.requestTimestamp);
   let failOnceConsumed = false;
@@ -185,7 +188,7 @@ export function createRefundToolRegistry(db: AppDatabase, options: CreateRefundT
         maybeFailOnce("get_refund_policy");
         const input = expectObject(args);
         rejectUnknownKeys(input, []);
-        return REFUND_POLICY;
+        return policyRepository.getActive();
       },
     },
     {
@@ -222,9 +225,12 @@ export function createRefundToolRegistry(db: AppDatabase, options: CreateRefundT
         const refunded = db
           .prepare("SELECT COALESCE(SUM(quantity), 0) AS quantity FROM refunds WHERE item_id = ?")
           .get(request.itemId) as { quantity: number };
-        return evaluateRefundEligibility(customer, order, request, {
+        const policy = policyRepository.getActive();
+        const evaluation = evaluateRefundEligibility(customer, order, request, {
           alreadyRefundedItemQuantity: refunded.quantity,
+          policy,
         });
+        return { ...evaluation, policyVersion: policy.version };
       },
     },
     {
@@ -250,6 +256,47 @@ export function createRefundToolRegistry(db: AppDatabase, options: CreateRefundT
           idempotencyKey: buildAgentIdempotencyKey(context.runId, request),
           runId: context.runId,
           request,
+        });
+      },
+    },
+    {
+      definition: {
+        type: "function",
+        name: "escalate_to_human",
+        description: "Create a durable human-support escalation when automation is unsafe, unsupported, or explicitly requested by the customer.",
+        strict: true,
+        parameters: {
+          type: "object",
+          properties: {
+            customerId: { type: "string" },
+            orderId: { type: "string" },
+            reasonCode: { type: "string", enum: [...ESCALATION_REASONS] },
+            summary: { type: "string", minLength: 1, maxLength: 1000 },
+          },
+          required: ["customerId", "orderId", "reasonCode", "summary"],
+          additionalProperties: false,
+        },
+      },
+      async execute(args, context) {
+        const input = expectObject(args);
+        rejectUnknownKeys(input, ["customerId", "orderId", "reasonCode", "summary"]);
+        const customerId = expectString(input.customerId, "customerId");
+        const orderId = expectString(input.orderId, "orderId");
+        const reasonCode = expectEnum(input.reasonCode, "reasonCode", ESCALATION_REASONS);
+        const summary = expectString(input.summary, "summary");
+        await assertAuthorizedCustomer(customerId);
+        const order = await orderRepository.findForCustomer(orderId, customerId);
+        if (!order) throw new AgentToolError("AUTHORIZATION_FAILED", "Escalation order does not belong to the authenticated customer.", false);
+        context.runRepository.setContext(context.runId, { customerId, orderId });
+        const customer = await customerRepository.findById(customerId);
+        const priority = customer?.riskLevel === "HIGH" || reasonCode === "HIGH_RISK" || reasonCode === "TOOL_FAILURE" ? "HIGH" : "NORMAL";
+        return new SupportEscalationRepository(db).createOrGet({
+          runId: context.runId,
+          customerId,
+          orderId,
+          reasonCode,
+          summary,
+          priority,
         });
       },
     },

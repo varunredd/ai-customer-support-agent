@@ -1,0 +1,56 @@
+# Render Blueprint: one web service + persistent SQLite disk.
+# Persistent disks require a paid instance (Starter or higher), not the free plan.
+# Secrets with sync: false are filled in the Render dashboard after first deploy.
+
+services:
+  - type: web
+    name: jobform
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health/live
+    disk:
+      name: jobform-data
+      mountPath: /app/.data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /app/.data/jobform-support.sqlite
+      - key: SUPPORT_ENTRY
+        value: all
+      - key: SEED_SAMPLE_CATALOG
+        value: "true"
+      - key: NOTIFICATION_DELIVERY_MODE
+        value: worker
+      - key: HEALTH_REQUIRE_OPENAI
+        value: "true"
+      - key: AUDIT_STORE_CUSTOMER_CONTENT
+        value: "false"
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_TRANSCRIBE_MODEL
+        value: gpt-4o-mini-transcribe
+      - key: OPENAI_TTS_MODEL
+        value: gpt-4o-mini-tts
+      - key: OPENAI_TTS_VOICE
+        value: marin
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_SESSION_SECRET
+        sync: false
+      - key: ADMIN_CONTROL_TOKEN
+        sync: false
+      - key: BUSINESS_INTEGRATION_SECRET
+        sync: false
+      - key: SUPPORT_LAUNCH_SECRET
+        sync: false
+      - key: INTERNAL_JOB_TOKEN
+        sync: false
+      - key: APP_BASE_URL
+        sync: false

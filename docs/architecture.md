@@ -1,8 +1,8 @@
-# Architecture — Final Submission
+# Architecture
 
 ## Deployment boundary
 
-The take-home stays as one Next.js App Router application. Concerns are separated internally rather than split into premature services.
+Jobform is one Next.js App Router application. Concerns are separated internally rather than split into premature services.
 
 ## Module boundaries
 
@@ -38,8 +38,10 @@ Model output is therefore treated as untrusted orchestration input.
 
 ```text
 Customer UI
+   |  portal: email + order ID lookup -> session bearer capability
+   |  host: signed one-time launch -> session bearer capability
    |
-   | POST /api/support/chat
+   | POST /api/support/chat (session authorization rechecked)
    v
 Support session boundary
    |
@@ -125,41 +127,46 @@ server-side TTS
 
 No refund tools are registered with the Realtime transcription session. The long-lived OpenAI key remains server-side; the browser receives only a short-lived client credential. TTS accepts a support `sessionId` and persisted AGENT `messageId`, not arbitrary browser text.
 
+## Production integration and access boundaries
+
+- `POST /api/integrations/business/context` accepts HMAC-signed canonical customer/order snapshots from a commerce backend.
+- Customer support starts from portal email/order lookup or a signed, expiring, single-use store launch. Both issue a session bearer capability.
+- Chat, support-session reads, Realtime credential minting, and TTS all require that session capability.
+- Staff sign in at `/login`. `src/proxy.ts` also accepts an optional gateway-injected admin secret.
+- Versioned policy, durable notification outbox, operational events, privacy retention, and human escalation sit around the deterministic refund core.
+
 ## Persistence choice
 
-SQLite is intentional for a self-contained hiring assignment: it keeps clone-to-run setup small and makes the refund transaction/idempotency behavior easy to demonstrate locally.
-
-`better-sqlite3` is isolated behind database/repository/service boundaries so moving to Postgres later would not require moving policy into the UI or LLM layer.
+SQLite is the included single-instance database. `better-sqlite3` is isolated behind database/repository/service boundaries so moving to Postgres later would not require moving policy into the UI or LLM layer.
 
 For hosting, the current build requires a writable persistent filesystem/volume. An ephemeral serverless filesystem is not a durable database target for this implementation.
 
-## Demo determinism
+## Catalog reset
 
-`npm run demo:reset` removes the local runtime database, re-applies migrations, seeds fixtures, and certifies that:
+`npm run db:bootstrap` removes the local runtime database, re-applies migrations, seeds the sample catalog, and certifies that:
 
 - 15 customers exist,
-- six demo orders exist,
+- six orders exist,
 - only the intentional historical partial-refund row remains,
-- approval/final-sale orders are unrefunded,
+- refundable and final-sale orders are in the expected ledger state,
 - no runtime runs, events, support sessions, or support messages remain.
 
-This provides a repeatable state before a Loom recording or evaluator run.
+## Source safety
 
-## Submission safety
+`npm run source:audit` checks Git-tracked files for accidental environment files, SQLite/runtime artifacts, ZIP bundles, build output, browser-exposed OpenAI credential names, and obvious OpenAI key material.
 
-`npm run submission:audit` checks Git-tracked files for accidental environment files, SQLite/runtime artifacts, ZIP bundles, build output, browser-exposed OpenAI credential names, and obvious OpenAI key material.
-
-GitHub Actions runs install → audit → demo reset → verify on pushes/pull requests. No live API key is needed for the deterministic test/build gate.
+GitHub Actions runs install → audit → catalog reset → verify on pushes/pull requests. No live API key is needed for the test/build gate.
 
 ## Deliberate scope exclusions
 
-The vertical slice does not claim production readiness for:
+The production foundation still does not claim generic enterprise readiness for:
 
-- production authentication/SSO,
-- multi-tenant authorization,
-- external payment-processor settlement,
-- a production CRM,
-- distributed database locking,
-- production secrets/deployment infrastructure.
+- native multi-tenant SSO/RBAC and per-user audit attribution,
+- external payment-processor settlement/webhook reconciliation,
+- managed PostgreSQL and distributed/durable worker infrastructure,
+- provider delivery/bounce webhook reconciliation,
+- organization-specific compliance certification, SIEM, and incident-response operations.
+
+A single-tenant launch can integrate with an existing commerce identity perimeter through the signed customer launch and identity-aware admin gateway described above.
 
 Those omissions are explicit scope choices rather than hidden behind mock UI. The evaluated path itself uses real persistence, real agent tool orchestration, deterministic refund policy, safe execution, and persisted observability.

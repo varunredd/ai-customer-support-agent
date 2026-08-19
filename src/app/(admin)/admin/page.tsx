@@ -44,7 +44,7 @@ export default function AdminOverviewPage() {
 
         <div className="kpi-grid">
           <StatCard label="Customers" value={String(customerCount)} hint={`${suspended} suspended · ${highRisk} high risk`} icon={<Users size={16} />} />
-          <StatCard label="Orders in scope" value={String(orderCount)} hint="Persisted deterministic CRM fixtures" icon={<Activity size={16} />} />
+          <StatCard label="Orders in scope" value={String(orderCount)} hint="Canonical orders currently in Jobform" icon={<Activity size={16} />} />
           <StatCard label="Agent runs today" value={String(todayRuns)} hint={`${completedToday} completed`} icon={<CheckCircle2 size={16} />} />
           <StatCard label="Policy engine" value={`${REFUND_POLICY.rules.length} rules`} hint={`${deniedCount} persisted deterministic denials`} tone="success" icon={<ShieldAlert size={16} />} />
         </div>
