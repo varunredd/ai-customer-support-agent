@@ -262,7 +262,8 @@ test("prior session messages are passed to the model as conversation history", a
     });
 
     assert.ok(capturedRequest);
-    const input = capturedRequest!.input as Array<{ role: string; content: string }>;
+    const request = capturedRequest as AgentModelRequest;
+    const input = request.input as Array<{ role: string; content: string }>;
     assert.equal(input.length, 4);
     assert.equal(input[0]?.role, "assistant");
     assert.match(input[1]?.content ?? "", /microphone in the headphones stopped working/i);
