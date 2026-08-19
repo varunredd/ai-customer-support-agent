@@ -1,6 +1,8 @@
 import type { ItemCondition, RefundReason } from "@/domain/refunds/types";
 import {
   catalogRuleTemplates,
+  mergePolicyRulesWithCatalog,
+  policyRulesNeedCatalogBackfill,
   type RefundPolicyRuleCode as CatalogRuleCode,
 } from "@/domain/refunds/policy-catalog";
 
@@ -69,4 +71,4 @@ export function buildPolicyDefinition(input: {
   };
 }
 
-export { catalogRuleTemplates };
+export { catalogRuleTemplates, mergePolicyRulesWithCatalog, policyRulesNeedCatalogBackfill };

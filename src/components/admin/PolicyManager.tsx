@@ -1,18 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import clsx from "clsx";
 import { ChevronDown } from "lucide-react";
 import {
   DEFAULT_CONDITION_ALLOWED,
   ITEM_CONDITIONS,
   REFUND_REASONS,
-  catalogRuleTemplates,
+  mergePolicyRulesWithCatalog,
   type RefundPolicyRule,
   type RefundPolicyRuleCode,
 } from "@/domain/refunds/policy";
 import {
   POLICY_CATALOG,
+  POLICY_RULE_CATEGORIES,
   catalogEntry,
   catalogRulesByCategory,
   type PolicyRuleCategory,
@@ -55,18 +56,17 @@ function cloneRules(rules: RefundPolicyRule[]) {
   }));
 }
 
+function initialRules(policy: PolicyRecord | null) {
+  return cloneRules(mergePolicyRulesWithCatalog(policy?.rules ?? []));
+}
+
 export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
   const [policy, setPolicy] = useState<PolicyRecord | null>(initialPolicy);
-  const [rules, setRules] = useState<RefundPolicyRule[]>(() => cloneRules(initialPolicy?.rules ?? []));
+  const [rules, setRules] = useState<RefundPolicyRule[]>(() => initialRules(initialPolicy));
   const [refundWindow, setRefundWindow] = useState(initialPolicy?.refundWindowDays ?? 30);
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const availableRuleCodes = useMemo(() => {
-    const used = new Set(rules.map((rule) => rule.code));
-    return POLICY_CATALOG.map((entry) => entry.code as RefundPolicyRuleCode).filter((code) => !used.has(code));
-  }, [rules]);
 
   const enabledCount = rules.filter((rule) => rule.enabled).length;
 
@@ -75,7 +75,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
     const payload = await response.json() as { policy: PolicyRecord | null };
     setPolicy(payload.policy);
     if (payload.policy) {
-      setRules(cloneRules(payload.policy.rules));
+      setRules(initialRules(payload.policy));
       setRefundWindow(payload.policy.refundWindowDays);
     }
   }
@@ -93,10 +93,10 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
       if (!response.ok) throw new Error(payload.error?.message ?? "Unable to create policy.");
       setPolicy(payload.policy ?? null);
       if (payload.policy) {
-        setRules(cloneRules(payload.policy.rules));
+        setRules(initialRules(payload.policy));
         setRefundWindow(payload.policy.refundWindowDays);
       }
-      setMessage("Policy created. Turn off checks you do not want, then save.");
+      setMessage("Policy ready. Check the rules you want enforced, then save.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to create policy.");
     } finally {
@@ -106,10 +106,6 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
 
   async function savePolicy() {
     if (!policy) return;
-    if (rules.length === 0) {
-      setMessage("Add at least one check before saving.");
-      return;
-    }
     if (enabledCount === 0) {
       setMessage("Enable at least one check before saving.");
       return;
@@ -133,25 +129,8 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
     }
   }
 
-  function loadAllChecks() {
-    setRules(cloneRules(catalogRuleTemplates()));
-    setMessage("All refund checks loaded. Disable or remove what does not apply to NovaShop.");
-  }
-
   function updateRule(index: number, patch: Partial<RefundPolicyRule>) {
     setRules((current) => current.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)));
-  }
-
-  function removeRule(index: number) {
-    setRules((current) => current.filter((_, i) => i !== index));
-    setExpandedRule(null);
-  }
-
-  function addRule(code: RefundPolicyRuleCode) {
-    const template = catalogRuleTemplates().find((rule) => rule.code === code);
-    if (!template) return;
-    setRules((current) => [...current, cloneRules([template])[0]!]);
-    setExpandedRule(code);
   }
 
   function toggleCondition(reason: string, condition: string, index: number) {
@@ -173,7 +152,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
   function renderRule(rule: RefundPolicyRule, index: number) {
     const isOpen = expandedRule === rule.code;
     return (
-      <div key={`${rule.code}-${index}`} className={styles.ruleRow}>
+      <div key={rule.code} className={styles.ruleRow}>
         <div className={styles.ruleSummary}>
           <label className={styles.ruleToggle} onClick={(event) => event.stopPropagation()}>
             <input
@@ -195,7 +174,6 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
             <p className={styles.ruleCode}><code>{rule.code}</code></p>
             <input className={styles.input} value={rule.title} onChange={(event) => updateRule(index, { title: event.target.value })} />
             <textarea className={styles.textarea} value={rule.text} onChange={(event) => updateRule(index, { text: event.target.value })} rows={2} />
-            <button type="button" className={styles.linkButton} onClick={() => removeRule(index)}>Remove check</button>
             {rule.code === "CONDITION_ALLOWED" ? (
               <div className={styles.matrix}>
                 <table className="table">
@@ -230,6 +208,20 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
     );
   }
 
+  function renderCategory(category: PolicyRuleCategory) {
+    return (
+      <div key={category} className={styles.categoryGroup}>
+        <h3 className={styles.categoryHeader}>{category}</h3>
+        {RULES_BY_CATEGORY[category].map((entry) => {
+          const index = rules.findIndex((rule) => rule.code === entry.code);
+          const rule = rules[index];
+          if (!rule) return null;
+          return renderRule(rule, index);
+        })}
+      </div>
+    );
+  }
+
   if (!policy) {
     return (
       <div className={styles.manager}>
@@ -254,7 +246,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
         <div className={styles.statusLine}>
           <StatusBadge status="SUCCESS">Live</StatusBadge>
           <p className={styles.statusText}>
-            <strong>{enabledCount}</strong>/{rules.length} enabled · {refundWindow}d window
+            <strong>{enabledCount}</strong>/{POLICY_CATALOG.length} enabled · {refundWindow}d window
           </p>
         </div>
         <button type="button" className={styles.button} disabled={busy} onClick={() => void savePolicy()}>
@@ -272,47 +264,10 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
 
         <div className={styles.rulesToolbar}>
           <span className={styles.rulesCount}>Checked = enforced on every refund request</span>
-          <div className={styles.toolbarActions}>
-            {rules.length === 0 ? (
-              <button type="button" className={styles.buttonSecondary} onClick={loadAllChecks}>Load all checks</button>
-            ) : null}
-            {availableRuleCodes.length > 0 ? (
-              <select
-                className={styles.select}
-                style={{ maxWidth: 240 }}
-                defaultValue=""
-                onChange={(event) => {
-                  const code = event.target.value as RefundPolicyRuleCode;
-                  if (!code) return;
-                  addRule(code);
-                  event.target.value = "";
-                }}
-              >
-                <option value="">Add check…</option>
-                {(Object.keys(RULES_BY_CATEGORY) as PolicyRuleCategory[]).map((category) => {
-                  const entries = RULES_BY_CATEGORY[category].filter((entry) => availableRuleCodes.includes(entry.code as RefundPolicyRuleCode));
-                  if (entries.length === 0) return null;
-                  return (
-                    <optgroup key={category} label={category}>
-                      {entries.map((entry) => (
-                        <option key={entry.code} value={entry.code}>{entry.title}</option>
-                      ))}
-                    </optgroup>
-                  );
-                })}
-              </select>
-            ) : null}
-          </div>
         </div>
 
         <div className={styles.ruleList}>
-          {rules.length === 0 ? (
-            <div className={styles.emptyRules}>
-              No checks yet. Click <strong>Load all checks</strong>, then disable what you do not need.
-            </div>
-          ) : (
-            rules.map((rule, index) => renderRule(rule, index))
-          )}
+          {POLICY_RULE_CATEGORIES.map((category) => renderCategory(category))}
         </div>
       </section>
     </div>

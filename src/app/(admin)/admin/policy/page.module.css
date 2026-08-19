@@ -239,6 +239,26 @@
   border-bottom: 1px solid var(--border);
 }
 
+.categoryGroup {
+  border-bottom: 1px solid var(--border);
+}
+
+.categoryGroup:last-child {
+  border-bottom: none;
+}
+
+.categoryHeader {
+  margin: 0;
+  padding: 14px 20px 8px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+}
+
 .rulesCount {
   font-size: 0.88rem;
   color: var(--muted);
