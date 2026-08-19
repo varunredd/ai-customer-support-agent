@@ -21,7 +21,9 @@ services:
       - key: SUPPORT_ENTRY
         value: all
       - key: SEED_SAMPLE_CATALOG
-        value: "true"
+        value: "false"
+      - key: ECOMMERCE_BASE_URL
+        sync: false
       - key: NOTIFICATION_DELIVERY_MODE
         value: worker
       - key: HEALTH_REQUIRE_OPENAI

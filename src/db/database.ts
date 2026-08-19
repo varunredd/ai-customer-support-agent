@@ -53,8 +53,7 @@ export function getDatabase(): AppDatabase {
     singleton = createDatabase(filename);
     const customerCount = (singleton.prepare("SELECT COUNT(*) AS count FROM customers").get() as { count: number }).count;
     if (customerCount === 0) {
-      const configured = process.env.SEED_SAMPLE_CATALOG?.trim().toLowerCase();
-      const allowSeed = configured === "true" || (configured !== "false" && process.env.NODE_ENV !== "production");
+      const allowSeed = process.env.SEED_SAMPLE_CATALOG?.trim().toLowerCase() === "true";
       if (allowSeed) seedCatalog(singleton);
     }
   }

@@ -9,8 +9,7 @@ export function getApplicationRepositories() {
   if (!initialized) {
     const customerCount = db.prepare("SELECT COUNT(*) AS count FROM customers").get() as { count: number };
     if (customerCount.count === 0) {
-      const configured = process.env.SEED_SAMPLE_CATALOG?.trim().toLowerCase();
-      const allowSeed = configured === "true" || (configured !== "false" && process.env.NODE_ENV !== "production");
+      const allowSeed = process.env.SEED_SAMPLE_CATALOG?.trim().toLowerCase() === "true";
       if (allowSeed) seedCatalog(db);
     }
     initialized = true;

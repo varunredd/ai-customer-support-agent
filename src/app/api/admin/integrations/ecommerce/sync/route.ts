@@ -36,11 +36,62 @@ export async function POST(request: Request) {
   }
 
   const customerId = typeof body.customerId === "string" ? body.customerId.trim() : "";
-  if (!customerId) {
-    return Response.json({ error: { code: "INVALID_REQUEST", message: "customerId is required." } }, { status: 400 });
+  const syncAll = body.syncAll === true;
+
+  if (!syncAll && !customerId) {
+    return Response.json({ error: { code: "INVALID_REQUEST", message: "customerId is required unless syncAll is true." } }, { status: 400 });
   }
 
   try {
+    if (syncAll) {
+      const rawBody = JSON.stringify({ limit: 500 });
+      const timestamp = String(Date.now());
+      const eventId = `pull_all_${randomUUID()}`;
+      const signature = signIntegrationPayload({
+        secret: integrationSecret(),
+        timestamp,
+        eventId,
+        rawBody,
+      });
+
+      const response = await fetch(`${ecommerceBaseUrl()}/api/integrations/jobform/export-all`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-jobform-timestamp": timestamp,
+          "x-jobform-event-id": eventId,
+          "x-jobform-signature": `sha256=${signature}`,
+          "x-jobform-source": "jobform-admin",
+        },
+        body: rawBody,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`E-commerce bulk export failed (${response.status}): ${text}`);
+      }
+
+      const payload = await response.json() as { snapshots?: unknown[] };
+      const snapshots = Array.isArray(payload.snapshots) ? payload.snapshots : [];
+      const db = getDatabase();
+      let syncedCustomers = 0;
+      let syncedOrders = 0;
+
+      for (const snapshot of snapshots) {
+        const parsed = parseBusinessContextSnapshot(snapshot);
+        const result = syncBusinessContext(db, {
+          source: "ecommerce-admin-pull-all",
+          eventId: `${eventId}_${syncedCustomers}`,
+          rawBody: JSON.stringify(snapshot),
+          snapshot: parsed,
+        });
+        syncedCustomers += 1;
+        syncedOrders += result.ordersUpserted;
+      }
+
+      return Response.json({ ok: true, syncAll: true, syncedCustomers, syncedOrders });
+    }
+
     const rawBody = JSON.stringify({ customerId });
     const timestamp = String(Date.now());
     const eventId = `pull_${randomUUID()}`;
