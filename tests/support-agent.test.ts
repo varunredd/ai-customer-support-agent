@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDatabase } from "@/db/database";
-import { seedDemoData } from "@/db/seed";
+import { seedCatalog } from "@/db/seed";
 import { AgentRunRepository } from "@/repositories/agent-run.repository";
 import { runSupportAgent } from "@/services/agent/support-agent.service";
 import { ScriptedAgentModel, finalResponse, toolCall } from "./helpers/scripted-agent-model";
 
 const approveToolArgs = {
   customerId: "cus_001",
-  orderId: "ord_demo_approve",
+  orderId: "ord_8901",
   itemId: "item_001",
   quantity: 1,
   reason: "CHANGED_MIND",
@@ -17,7 +17,7 @@ const approveToolArgs = {
 
 function setup() {
   const db = createDatabase(":memory:");
-  seedDemoData(db);
+  seedCatalog(db);
   return db;
 }
 
@@ -26,7 +26,7 @@ test("agent tool loop persists audit events and duplicate execute calls cannot d
   try {
     const model = new ScriptedAgentModel([
       toolCall("1", "lookup_customer_by_email", { email: "maya@example.com" }),
-      toolCall("2", "lookup_order", { orderId: "ord_demo_approve", customerId: "cus_001" }),
+      toolCall("2", "lookup_order", { orderId: "ord_8901", customerId: "cus_001" }),
       toolCall("3", "get_refund_policy", {}),
       toolCall("4", "validate_refund_request", approveToolArgs),
       toolCall("5", "execute_refund", approveToolArgs),
@@ -42,7 +42,7 @@ test("agent tool loop persists audit events and duplicate execute calls cannot d
 
     assert.equal(result.status, "COMPLETED");
     assert.equal(
-      (db.prepare("SELECT COUNT(*) AS count FROM refunds WHERE order_id = 'ord_demo_approve'").get() as { count: number })
+      (db.prepare("SELECT COUNT(*) AS count FROM refunds WHERE order_id = 'ord_8901'").get() as { count: number })
         .count,
       1,
     );
@@ -65,7 +65,7 @@ test("denied agent path produces no refund ledger record", async () => {
   try {
     const denyToolArgs = {
       customerId: "cus_002",
-      orderId: "ord_demo_final_sale",
+      orderId: "ord_8902",
       itemId: "item_002",
       quantity: 1,
       reason: "CHANGED_MIND",
@@ -73,7 +73,7 @@ test("denied agent path produces no refund ledger record", async () => {
     };
     const model = new ScriptedAgentModel([
       toolCall("d1", "lookup_customer_by_email", { email: "noah@example.com" }),
-      toolCall("d2", "lookup_order", { orderId: "ord_demo_final_sale", customerId: "cus_002" }),
+      toolCall("d2", "lookup_order", { orderId: "ord_8902", customerId: "cus_002" }),
       toolCall("d3", "get_refund_policy", {}),
       toolCall("d4", "validate_refund_request", denyToolArgs),
       finalResponse("d5", "This final-sale item is not eligible for a refund."),
@@ -86,7 +86,7 @@ test("denied agent path produces no refund ledger record", async () => {
     });
     assert.equal(result.status, "COMPLETED");
     assert.equal(
-      (db.prepare("SELECT COUNT(*) AS count FROM refunds WHERE order_id = 'ord_demo_final_sale'").get() as {
+      (db.prepare("SELECT COUNT(*) AS count FROM refunds WHERE order_id = 'ord_8902'").get() as {
         count: number;
       }).count,
       0,
@@ -105,7 +105,7 @@ test("execution rechecks policy even if the model skips validate_refund_request"
     const model = new ScriptedAgentModel([
       toolCall("x1", "execute_refund", {
         customerId: "cus_002",
-        orderId: "ord_demo_final_sale",
+        orderId: "ord_8902",
         itemId: "item_002",
         quantity: 1,
         reason: "CHANGED_MIND",
@@ -121,7 +121,7 @@ test("execution rechecks policy even if the model skips validate_refund_request"
     });
     const run = new AgentRunRepository(db).findById(result.runId);
     assert.equal(
-      (db.prepare("SELECT COUNT(*) AS count FROM refunds WHERE order_id = 'ord_demo_final_sale'").get() as {
+      (db.prepare("SELECT COUNT(*) AS count FROM refunds WHERE order_id = 'ord_8902'").get() as {
         count: number;
       }).count,
       0,
@@ -163,7 +163,7 @@ test("server-owned request timestamp drives return-window eligibility", async ()
     const model = new ScriptedAgentModel([
       toolCall("t1", "validate_refund_request", {
         customerId: "cus_003",
-        orderId: "ord_demo_expired",
+        orderId: "ord_8903",
         itemId: "item_003",
         quantity: 1,
         reason: "CHANGED_MIND",
@@ -192,7 +192,7 @@ test("retryable tool failure is visibly logged as failure then retry then succes
   const db = setup();
   try {
     const model = new ScriptedAgentModel([
-      toolCall("r1", "lookup_order", { orderId: "ord_demo_approve", customerId: "cus_001" }),
+      toolCall("r1", "lookup_order", { orderId: "ord_8901", customerId: "cus_001" }),
       finalResponse("r2", "I found the order."),
     ]);
     const result = await runSupportAgent(

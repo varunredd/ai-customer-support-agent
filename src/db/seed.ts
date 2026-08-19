@@ -1,8 +1,9 @@
 import type { AppDatabase } from "@/db/database";
 import { customers } from "@/data/customers";
 import { orders } from "@/data/orders";
+import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 
-export function seedDemoData(db: AppDatabase) {
+export function seedCatalog(db: AppDatabase) {
   const insertCustomer = db.prepare(`
     INSERT INTO customers (
       id, name, email, account_status, risk_level, lifetime_orders, lifetime_refunds, created_at
@@ -90,8 +91,7 @@ export function seedDemoData(db: AppDatabase) {
       }
     }
 
-    // The Phase 1 partial-refund fixture already carries $30.00 in refundedCents.
-    // Seed the matching item-level ledger row so Phase 2 can enforce remaining quantity correctly.
+    // Seed the matching item-level ledger row so remaining quantity is enforced.
     db.prepare(`
       INSERT OR IGNORE INTO refunds (
         id, idempotency_key, request_fingerprint, run_id, customer_id, order_id, item_id,
@@ -99,10 +99,10 @@ export function seedDemoData(db: AppDatabase) {
       ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 'USD', 'COMPLETED', ?, ?)
     `).run(
       "ref_seed_partial",
-      "seed:ord_demo_partial:item_006:1",
+      "seed:ord_8906:item_006:1",
       "seeded-historical-refund",
       "cus_009",
-      "ord_demo_partial",
+      "ord_8906",
       "item_006",
       1,
       "CHANGED_MIND",
@@ -119,4 +119,5 @@ export function seedDemoData(db: AppDatabase) {
   });
 
   transaction();
+  new RefundPolicyRepository(db).ensureDefault();
 }

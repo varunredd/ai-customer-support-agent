@@ -27,6 +27,7 @@ async function responseError(response: Response, fallback: string) {
 
 export function useRealtimeTranscription(input: {
   sessionId: string | null;
+  accessToken?: string | null;
   disabled?: boolean;
   onFinalTranscript: (transcript: string) => void | Promise<void>;
 }) {
@@ -93,7 +94,10 @@ export function useRealtimeTranscription(input: {
 
       const credentialResponse = await fetch("/api/voice/realtime/client-secret", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(input.accessToken ? { Authorization: `Bearer ${input.accessToken}` } : {}),
+        },
         body: JSON.stringify({ sessionId: input.sessionId }),
       });
       if (!credentialResponse.ok) {

@@ -1,6 +1,6 @@
 {
   "name": "jobform-ai-support-agent",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
@@ -15,11 +15,17 @@
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:seed": "tsx scripts/db-seed.ts",
     "db:reset": "tsx scripts/db-reset.ts",
-    "demo:agent": "tsx scripts/run-agent-demo.ts",
-    "demo:check": "tsx scripts/verify-demo-fixtures.ts",
-    "demo:reset": "npm run db:reset && npm run demo:check",
-    "submission:audit": "tsx scripts/submission-audit.ts",
-    "submission:check": "npm run submission:audit && npm run demo:check && npm run verify"
+    "catalog:check": "tsx scripts/verify-catalog.ts",
+    "db:bootstrap": "npm run db:reset && npm run catalog:check",
+    "agent:replay": "tsx scripts/run-agent-replay.ts",
+    "source:audit": "tsx scripts/source-audit.ts",
+    "ci:check": "npm run source:audit && npm run catalog:check && npm run verify",
+    "notifications:drain": "tsx scripts/notifications-drain.ts",
+    "production:preflight": "tsx scripts/production-preflight.ts",
+    "production:check": "npm run production:preflight && npm run ci:check",
+    "retention:apply": "tsx scripts/data-retention.ts",
+    "integration:sign": "tsx scripts/sign-business-context.ts",
+    "support:launch-token": "tsx scripts/create-support-launch.ts"
   },
   "dependencies": {
     "@next/env": "16.3.1",

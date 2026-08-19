@@ -1,4 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { drainNotificationOutbox } from "@/services/notifications/notification.service";
+import { operationalLog } from "@/lib/observability/system-logger";
+import { assertSupportSessionAccess, SupportAccessError } from "@/security/support-access";
+import { consumeRateLimit, RateLimitExceededError } from "@/security/rate-limit";
 import { getDatabase } from "@/db/database";
 import type { PersistedAgentEvent } from "@/domain/agent/types";
 import { OpenAIResponsesClient } from "@/integrations/openai/openai-responses.client";
@@ -35,6 +39,7 @@ function publicError(error: unknown) {
 }
 
 export async function POST(request: Request) {
+  const requestId = request.headers.get("x-request-id")?.slice(0, 128) || `req_${randomUUID()}`;
   let body: Record<string, unknown>;
   try {
     body = asObject(await request.json());
@@ -54,14 +59,28 @@ export async function POST(request: Request) {
   const db = getDatabase();
   let detail;
   try {
+    assertSupportSessionAccess(db, sessionId, request);
     detail = await getSupportSessionDetail(db, sessionId);
   } catch (error) {
+    if (error instanceof SupportAccessError) return jsonError(error.code === "SUPPORT_SESSION_NOT_FOUND" ? 404 : 401, error.code, error.message);
     if (error instanceof SupportSessionNotFoundError) return jsonError(404, error.code, error.message);
     return jsonError(500, "SESSION_READ_FAILED", "Unable to load support session.");
   }
 
   if (detail.session.status !== "OPEN") {
     return jsonError(409, "SESSION_CLOSED", "This support session is closed.");
+  }
+
+  try {
+    consumeRateLimit(db, { key: `support-chat:${sessionId}`, limit: 20, windowMs: 60_000 });
+  } catch (error) {
+    if (error instanceof RateLimitExceededError) {
+      return Response.json(
+        { error: { code: error.code, message: "Too many support requests. Please wait before trying again." } },
+        { status: 429, headers: { "Retry-After": String(error.retryAfterSeconds) } },
+      );
+    }
+    throw error;
   }
 
   const runId = `run_${randomUUID()}`;
@@ -71,10 +90,6 @@ export async function POST(request: Request) {
     role: "CUSTOMER",
     content: message,
   });
-
-  const demoFailure = body.demoFailure === "LOOKUP_ORDER_ONCE" && process.env.ENABLE_DEMO_FAILURES === "true"
-    ? "lookup_order"
-    : undefined;
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -112,7 +127,6 @@ export async function POST(request: Request) {
               orderId: detail.order.id,
             },
             {
-              failOnceTool: demoFailure,
               onEvent: async (event: PersistedAgentEvent) => {
                 sessions.setMessageRunId(customerMessage.id, runId);
                 send("agent_event", event);
@@ -128,8 +142,34 @@ export async function POST(request: Request) {
           });
           send("assistant_message", agentMessage);
           send("done", { runId, status: result.status });
+          operationalLog({
+            severity: "INFO",
+            source: "support-chat",
+            code: "SUPPORT_RUN_COMPLETED",
+            message: "Support agent run completed.",
+            requestId,
+            runId,
+            metadata: { sessionId, status: result.status },
+          }, db);
+          if (process.env.NOTIFICATION_DELIVERY_MODE === "inline") {
+            try {
+              await drainNotificationOutbox(db, { limit: 10 });
+            } catch {
+              // Notification delivery is intentionally decoupled from the completed support workflow.
+            }
+          }
         } catch (error) {
-          send("error", publicError(error));
+          const publicFailure = publicError(error);
+          operationalLog({
+            severity: "ERROR",
+            source: "support-chat",
+            code: publicFailure.code,
+            message: "Support agent run failed.",
+            requestId,
+            runId,
+            metadata: { sessionId },
+          }, db);
+          send("error", publicFailure);
         } finally {
           finish();
         }
@@ -143,6 +183,7 @@ export async function POST(request: Request) {
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
+      "X-Request-Id": requestId,
     },
   });
 }

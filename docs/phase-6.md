@@ -36,9 +36,9 @@ After `npm run demo:reset`:
 - refund count = 1 (the seeded historical partial refund),
 - agent runs/events = 0,
 - support sessions/messages = 0,
-- `ord_demo_approve` refunded balance = 0,
-- `ord_demo_final_sale` refunded balance = 0,
-- `ord_demo_partial` refunded balance = $30.00.
+- `ord_8901` refunded balance = 0,
+- `ord_8902` refunded balance = 0,
+- `ord_8906` refunded balance = $30.00.
 
 This protects the recorded approval demo from being denied because an earlier local run already refunded Maya's headphones.
 

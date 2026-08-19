@@ -82,7 +82,7 @@ async function maybeLogDeterministicEvents(
       type: "POLICY_CHECK",
       status: evaluation.decision === "APPROVE" ? "SUCCESS" : "FAILED",
       title: "Deterministic refund policy evaluated",
-      metadata: { checks },
+      metadata: { checks, policyVersion: evaluation.policyVersion ?? null },
     });
     if (evaluation.decision === "APPROVE" || evaluation.decision === "DENY") {
       await appendEvent({
@@ -94,6 +94,7 @@ async function maybeLogDeterministicEvents(
           decision: evaluation.decision,
           refundAmountCents: evaluation.refundAmountCents,
           denialReasons: evaluation.denialReasons,
+          policyVersion: evaluation.policyVersion ?? null,
         },
       });
     }
@@ -111,6 +112,22 @@ async function maybeLogDeterministicEvents(
         idempotentReplay: execution.idempotentReplay,
         refund: execution.refund,
         evaluation: execution.evaluation,
+      },
+    });
+  }
+
+  if (toolName === "escalate_to_human" && result && typeof result === "object" && !Array.isArray(result)) {
+    const escalation = result as Record<string, unknown>;
+    await appendEvent({
+      runId,
+      type: "ESCALATION",
+      status: "WARNING",
+      title: "Support request escalated to a human",
+      metadata: {
+        escalationId: escalation.id,
+        reasonCode: escalation.reasonCode,
+        priority: escalation.priority,
+        status: escalation.status,
       },
     });
   }
@@ -136,10 +153,14 @@ export async function runSupportAgent(
   });
   const toolDefinitions = Array.from(tools.values(), (tool) => tool.definition);
   const userInput = buildUserInput(input, requestedAt);
+  const persistCustomerContent = process.env.NODE_ENV !== "production" || process.env.AUDIT_STORE_CUSTOMER_CONTENT === "true";
+  const persistedInput = persistCustomerContent
+    ? userInput
+    : `Authenticated customer context: [REDACTED]\nActive support order: ${input.orderId ?? "[not supplied]"}\nRequest timestamp: ${requestedAt}\n\nCustomer message: [REDACTED]`;
   const runId = runRepository.create({
     id: input.runId ?? `run_${randomUUID()}`,
     model: model.model,
-    inputText: userInput,
+    inputText: persistedInput,
   });
 
   if (input.orderId) {
@@ -157,7 +178,7 @@ export async function runSupportAgent(
     type: "REQUEST_RECEIVED",
     status: "SUCCESS",
     title: "Customer support request received",
-    metadata: { customerEmail: input.customerEmail ?? null, requestedAt },
+    metadata: { customerContextBound: Boolean(input.customerEmail), requestedAt },
   });
 
   const conversationInput: unknown[] = [{ role: "user", content: userInput }];

@@ -1,0 +1,90 @@
+.shell {
+  width: min(680px, 100%);
+  margin: 24px auto 0;
+  padding: clamp(28px, 5vw, 48px);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: rgba(255, 252, 248, 0.82);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 22px;
+}
+
+.icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--ok);
+  background: var(--ok-bg);
+  border: 1px solid rgba(15, 118, 110, 0.16);
+}
+
+.copy {
+  display: grid;
+  gap: 8px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--ok);
+  font-size: 0.76rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.copy h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(1.35rem, 2.5vw, 1.8rem);
+  letter-spacing: -0.04em;
+}
+
+.copy p,
+.help {
+  margin: 0;
+  color: var(--muted-strong);
+  line-height: 1.6;
+}
+
+.note,
+.error {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 16px;
+}
+
+.note {
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.note div,
+.error {
+  display: grid;
+  gap: 3px;
+}
+
+.note span,
+.error span {
+  color: var(--muted-strong);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.error {
+  color: var(--error);
+  background: var(--error-bg);
+  border: 1px solid rgba(185, 28, 28, 0.16);
+}
+
+.help {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.84rem;
+}

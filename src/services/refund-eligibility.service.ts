@@ -1,4 +1,4 @@
-import { REFUND_POLICY } from "@/domain/refunds/policy";
+import { REFUND_POLICY, type RefundPolicyDefinition } from "@/domain/refunds/policy";
 import type { Customer, Order, RefundEvaluation, RefundRequest, RuleCheck } from "@/domain/refunds/types";
 import { differenceInCalendarDays } from "@/lib/date";
 
@@ -18,6 +18,7 @@ function conditionIsAllowed(request: RefundRequest): boolean {
 
 export interface RefundEvaluationContext {
   alreadyRefundedItemQuantity?: number;
+  policy?: RefundPolicyDefinition;
 }
 
 export function evaluateRefundEligibility(
@@ -30,6 +31,7 @@ export function evaluateRefundEligibility(
   const daysSinceDelivery = order.deliveredAt
     ? differenceInCalendarDays(request.requestedAt, order.deliveredAt)
     : null;
+  const policy = context.policy ?? REFUND_POLICY;
   const alreadyRefundedItemQuantity = Math.max(0, context.alreadyRefundedItemQuantity ?? 0);
   const remainingItemQuantity = item ? Math.max(0, item.quantity - alreadyRefundedItemQuantity) : 0;
   const itemRefundCents = item ? item.unitPriceCents * request.quantity : 0;
@@ -40,7 +42,7 @@ export function evaluateRefundEligibility(
     check("RISK_NOT_HIGH", customer.riskLevel !== "HIGH", "High-risk accounts require a human workflow and are denied by the automated path.", { riskLevel: customer.riskLevel }),
     check("ORDER_OWNERSHIP", order.customerId === customer.id && request.customerId === customer.id, "Customer must own the order.", { orderCustomerId: order.customerId, requestCustomerId: request.customerId }),
     check("ORDER_DELIVERED", order.status === "DELIVERED" && Boolean(order.deliveredAt), "Order must be delivered before refund evaluation.", { orderStatus: order.status, deliveredAt: order.deliveredAt }),
-    check("WITHIN_WINDOW", daysSinceDelivery !== null && daysSinceDelivery >= 0 && daysSinceDelivery <= REFUND_POLICY.refundWindowDays, `Request must be within ${REFUND_POLICY.refundWindowDays} days of delivery.`, { daysSinceDelivery, allowedDays: REFUND_POLICY.refundWindowDays }),
+    check("WITHIN_WINDOW", daysSinceDelivery !== null && daysSinceDelivery >= 0 && daysSinceDelivery <= policy.refundWindowDays, `Request must be within ${policy.refundWindowDays} days of delivery.`, { daysSinceDelivery, allowedDays: policy.refundWindowDays }),
     check("ITEM_REFUNDABLE", Boolean(item?.refundable), "Item must be explicitly refundable.", { itemFound: Boolean(item), refundable: item?.refundable ?? false }),
     check("NOT_FINAL_SALE", item !== undefined && item.finalSale === false, "Final-sale items cannot be refunded.", { finalSale: item?.finalSale ?? null }),
     check("VALID_QUANTITY", item !== undefined && Number.isInteger(request.quantity) && request.quantity >= 1 && request.quantity <= remainingItemQuantity, "Refund quantity must not exceed the remaining unrefunded purchased quantity.", { requestedQuantity: request.quantity, purchasedQuantity: item?.quantity ?? 0, alreadyRefundedItemQuantity, remainingItemQuantity }),

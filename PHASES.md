@@ -1,4 +1,6 @@
-# Delivery Phases
+# Delivery History
+
+Jobform is a standalone customer-support product. This file is a historical delivery log, not the product contract.
 
 ## Phase 1 — Domain foundation and policy engine — COMPLETE
 
@@ -115,3 +117,43 @@ Acceptance gate:
 - Required demo paths start from certified deterministic state.
 - No secrets, local databases, generated runtime state, or overlay/source ZIPs are tracked.
 - Public documentation matches the certified runtime behavior and phase boundaries.
+
+## Production Track P0 — Launch foundation — IMPLEMENTED, LOCAL CERTIFICATION PENDING
+
+Purpose:
+- Extend the certified hiring vertical slice with the highest-value launch controls without creating a second agent or weakening deterministic refund authority.
+
+Delivered:
+- Versioned persisted refund-policy repository with atomic draft/publish lifecycle.
+- Runtime policy loading in policy lookup, validation, and refund execution; every new refund records the policy version that authorized it.
+- Signed HMAC business-context ingestion endpoint with timestamp validation, event-id idempotency, replay protection, and canonical CRM/order upsert.
+- Durable notification outbox written in the same refund transaction, plus Resend delivery worker with provider idempotency keys and retry/dead-letter state.
+- Protected internal notification-drain endpoint suitable for a scheduler/worker.
+- Structured operational logging persisted separately from agent reasoning events, with sensitive metadata redaction.
+- Human-escalation tool and persisted escalation queue for high-risk, unsupported, failed, or customer-requested handoffs.
+- Production privacy controls: production audit-content redaction and configurable retention jobs.
+- Liveness/readiness endpoints and production environment preflight.
+- Security response headers and standalone Next.js build output.
+- Container deployment artifacts with a persistent SQLite volume for a single-instance production/MVP deployment.
+- Admin views for active policy/version history, human escalations, system events, and notification delivery state.
+- Secure production support launch: short-lived signed customer/order launch, one-time JTI consumption, random session capability, and authorization on chat/session/voice/TTS routes.
+- Customer CRM directory and deterministic demo route disabled in production host mode.
+- Admin UI/API perimeter protected behind an identity-aware gateway-injected secret in production.
+
+Explicit remaining enterprise blockers:
+- Native customer/admin SSO, per-user RBAC, and user-level audit attribution beyond the current host-launch / identity-gateway boundary.
+- Tenant isolation/RBAC for a multi-tenant SaaS deployment.
+- Managed PostgreSQL and horizontally scalable background jobs.
+- Real payment-provider refund execution/webhook reconciliation.
+- Resend webhook delivery/bounce reconciliation.
+
+Acceptance gate:
+- Existing deterministic refund and voice paths remain unchanged in authority.
+- Published policy changes affect runtime eligibility without a code deploy.
+- An exact integration event replay is idempotent and a reused event ID with a different body is rejected.
+- Refund completion queues exactly one notification even on idempotent refund replay.
+- Sensitive fields are redacted from persisted agent-event metadata.
+- Human escalation cannot switch customer/order ownership.
+- Signed support launches expire, are single-use, and exchange into a bearer-protected support session.
+- Production host mode cannot enumerate CRM customers/orders or expose evaluator demo routes.
+- `npm run submission:check` remains green with the expanded test suite.

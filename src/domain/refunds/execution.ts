@@ -19,6 +19,7 @@ export interface RefundRecord {
   amountCents: number;
   currency: "USD";
   status: "COMPLETED";
+  policyVersion: string | null;
   createdAt: string;
 }
 

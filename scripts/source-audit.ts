@@ -7,7 +7,7 @@ function candidateFiles(): string[] {
   return output.split("\0").filter(Boolean);
 }
 
-function isForbiddenSubmissionPath(file: string): boolean {
+function isForbiddenRuntimePath(file: string): boolean {
   const normalized = file.replaceAll("\\", "/");
   const base = path.posix.basename(normalized);
 
@@ -25,8 +25,8 @@ const files = candidateFiles();
 const problems: string[] = [];
 
 for (const file of files) {
-  if (isForbiddenSubmissionPath(file)) {
-    problems.push(`forbidden submission artifact: ${file}`);
+  if (isForbiddenRuntimePath(file)) {
+    problems.push(`forbidden runtime artifact: ${file}`);
     continue;
   }
 
@@ -47,6 +47,11 @@ for (const file of files) {
     problems.push(`browser-exposed OpenAI credential name found in ${file}`);
   }
 
+  const browserSecretName = text.match(/\bNEXT_PUBLIC_[A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|API_KEY|OPENAI|RESEND|ADMIN|BUSINESS)[A-Z0-9_]*\b/);
+  if (browserSecretName) {
+    problems.push(`browser-exposed secret-like environment name found in ${file}: ${browserSecretName[0]}`);
+  }
+
   const keyMatch = text.match(/\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/);
   if (keyMatch) {
     problems.push(`possible OpenAI secret found in ${file}`);
@@ -54,10 +59,10 @@ for (const file of files) {
 }
 
 if (problems.length > 0) {
-  console.error("Submission audit failed:");
+  console.error("Source audit failed:");
   for (const problem of problems) console.error(`- ${problem}`);
   process.exitCode = 1;
 } else {
-  console.log(`Submission audit passed: ${files.length} tracked/untracked submission files inspected.`);
-  console.log("No candidate env secrets, runtime databases, build artifacts, ZIP bundles, or obvious OpenAI keys found.");
+  console.log(`Source audit passed: ${files.length} tracked/untracked files inspected.`);
+  console.log("No candidate env secrets, browser-exposed secret-like names, runtime databases, build artifacts, ZIP bundles, or obvious OpenAI keys found.");
 }

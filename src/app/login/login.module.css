@@ -1,0 +1,128 @@
+.page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(255, 252, 248, 0.62);
+}
+
+.shell {
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 28px 28px 24px;
+  border-radius: 20px;
+  background: #fffdf9;
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 40px -28px rgba(48, 40, 58, 0.55);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 8px;
+  border-radius: 11px;
+  color: white;
+  background: linear-gradient(180deg, #7c78f0 0%, #5b57d6 100%);
+  box-shadow: 0 8px 16px -8px rgba(91, 87, 214, 0.9);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent-text);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.card h1 {
+  margin: 0;
+  font-size: 1.45rem;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+}
+
+.copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 650;
+  color: var(--muted-strong);
+}
+
+.field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: white;
+  color: var(--text);
+  outline: none;
+}
+
+.field input::placeholder {
+  color: #9a93a8;
+}
+
+.field input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--error-bg);
+  color: var(--error);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.submit {
+  width: 100%;
+  margin-top: 4px;
+  height: 46px;
+  border-radius: 12px;
+}
+
+.back {
+  align-self: center;
+  color: var(--muted-strong);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--text);
+}

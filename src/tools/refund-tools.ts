@@ -1,7 +1,7 @@
-import { REFUND_POLICY } from "@/domain/refunds/policy";
 import type { ExecuteRefundInput } from "@/domain/refunds/execution";
 import type { RefundRequest } from "@/domain/refunds/types";
 import { getApplicationRepositories } from "@/repositories";
+import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 import { evaluateRefundEligibility } from "@/services/refund-eligibility.service";
 import { executeRefundAtomically } from "@/services/refund-execution.service";
 
@@ -16,7 +16,8 @@ export async function lookupOrder(orderId: string, customerId: string) {
 }
 
 export async function getRefundPolicy() {
-  return REFUND_POLICY;
+  const { db } = getApplicationRepositories();
+  return new RefundPolicyRepository(db).getActive();
 }
 
 export async function validateRefundRequest(request: RefundRequest) {
@@ -35,9 +36,12 @@ export async function validateRefundRequest(request: RefundRequest) {
     .prepare("SELECT COALESCE(SUM(quantity), 0) AS quantity FROM refunds WHERE item_id = ?")
     .get(request.itemId) as { quantity: number };
 
-  return evaluateRefundEligibility(customer, order, request, {
+  const policy = new RefundPolicyRepository(db).getActive();
+  const evaluation = evaluateRefundEligibility(customer, order, request, {
     alreadyRefundedItemQuantity: refunded.quantity,
+    policy,
   });
+  return { ...evaluation, policyVersion: policy.version };
 }
 
 export async function executeRefund(input: ExecuteRefundInput) {

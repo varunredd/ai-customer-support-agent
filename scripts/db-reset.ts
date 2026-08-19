@@ -2,7 +2,7 @@ import "./load-env";
 import fs from "node:fs";
 import path from "node:path";
 import { createDatabase } from "@/db/database";
-import { seedDemoData } from "@/db/seed";
+import { seedCatalog } from "@/db/seed";
 
 const filename = process.env.DATABASE_PATH?.trim() || ".data/jobform-support.sqlite";
 if (filename === ":memory:") throw new Error("db:reset requires a file-backed DATABASE_PATH.");
@@ -12,6 +12,6 @@ for (const suffix of ["", "-shm", "-wal"]) {
   if (fs.existsSync(target)) fs.rmSync(target, { force: true });
 }
 const db = createDatabase(filename);
-seedDemoData(db);
+seedCatalog(db);
 console.log(`Database reset and seeded: ${filename}`);
 db.close();

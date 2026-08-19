@@ -15,8 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Jobform Automator",
-  description: "Policy-grounded AI customer support agent",
+  title: "Jobform",
+  description: "AI customer support with deterministic refund policy.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
