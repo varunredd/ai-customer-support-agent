@@ -301,5 +301,20 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
     };
   });
 
-  return executeTransaction.immediate();
+  const result = executeTransaction.immediate();
+  if (result.status === "COMPLETED" && !result.idempotentReplay && result.refund) {
+    void import("@/services/integrations/ecommerce-refund-notify.service").then(({ notifyEcommerceRefundCompleted }) =>
+      notifyEcommerceRefundCompleted({
+        refundId: result.refund!.id,
+        customerId: result.refund!.customerId,
+        orderId: result.refund!.orderId,
+        itemId: result.refund!.itemId,
+        quantity: result.refund!.quantity,
+        amountCents: result.refund!.amountCents,
+        reason: result.refund!.reason,
+        condition: result.refund!.condition,
+      }),
+    );
+  }
+  return result;
 }

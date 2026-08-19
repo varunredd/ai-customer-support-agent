@@ -15,6 +15,7 @@
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:seed": "tsx scripts/db-seed.ts",
     "db:reset": "tsx scripts/db-reset.ts",
+    "db:clear": "tsx scripts/db-clear.ts",
     "catalog:check": "tsx scripts/verify-catalog.ts",
     "db:bootstrap": "npm run db:reset && npm run catalog:check",
     "agent:replay": "tsx scripts/run-agent-replay.ts",

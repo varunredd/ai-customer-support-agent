@@ -164,6 +164,23 @@ export class RefundPolicyRepository {
       throw new Error("Only draft policies can be edited.");
     }
 
+    return this.savePolicy(id, current.status, input);
+  }
+
+  updateActive(input: { refundWindowDays?: number; rules?: RefundPolicyRule[] }): PersistedRefundPolicy {
+    const current = this.getActiveOrNull();
+    if (!current) throw new Error("No active refund policy is published.");
+    return this.savePolicy(current.id, "ACTIVE", input);
+  }
+
+  private savePolicy(
+    id: string,
+    status: RefundPolicyStatus,
+    input: { version?: string; refundWindowDays?: number; rules?: RefundPolicyRule[] },
+  ): PersistedRefundPolicy {
+    const current = this.findById(id);
+    if (!current) throw new Error("Refund policy was not found.");
+
     const version = input.version !== undefined ? input.version.trim() : current.version;
     if (!version || version.length > 80) {
       throw new Error("Policy version is required and must be at most 80 characters.");
@@ -177,8 +194,8 @@ export class RefundPolicyRepository {
     this.db
       .prepare(`UPDATE refund_policy_versions
         SET version = ?, refund_window_days = ?, rules_json = ?
-        WHERE id = ?`)
-      .run(version, refundWindowDays, JSON.stringify(rules), id);
+        WHERE id = ? AND status = ?`)
+      .run(version, refundWindowDays, JSON.stringify(rules), id, status);
     return this.findById(id)!;
   }
 

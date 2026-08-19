@@ -19,11 +19,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ polic
   try {
     const { policyId } = await context.params;
     const body = await request.json() as Record<string, unknown>;
-    const policy = new RefundPolicyRepository(getDatabase()).updateDraft(policyId, {
+    const repository = new RefundPolicyRepository(getDatabase());
+    const current = repository.findById(policyId);
+    if (!current) throw new Error("Refund policy was not found.");
+    if (current.status === "ARCHIVED") throw new Error("Archived policies cannot be edited.");
+
+    const patch = {
       version: typeof body.version === "string" ? body.version : undefined,
       refundWindowDays: typeof body.refundWindowDays === "number" ? body.refundWindowDays : undefined,
       rules: parseRules(body),
-    });
+    };
+
+    const policy = current.status === "ACTIVE"
+      ? repository.updateActive(patch)
+      : repository.updateDraft(policyId, patch);
     return Response.json({ policy });
   } catch (error) {
     return Response.json({ error: { code: "POLICY_UPDATE_FAILED", message: error instanceof Error ? error.message : "Unable to update policy." } }, { status: 400 });
