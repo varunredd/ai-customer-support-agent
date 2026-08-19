@@ -46,7 +46,7 @@ function cloneRules(rules: RefundPolicyRule[]): RefundPolicyRule[] {
 
 function normalizeRules(rules: RefundPolicyRule[]): RefundPolicyRule[] {
   if (!Array.isArray(rules) || rules.length === 0) {
-    throw new Error("At least one policy rule is required.");
+    return [];
   }
 
   const seen = new Set<string>();
@@ -120,6 +120,45 @@ export class RefundPolicyRepository {
       .all() as PolicyRow[]).map(mapPolicy);
   }
 
+  createActive(input: {
+    refundWindowDays: number;
+    rules?: RefundPolicyRule[];
+    version?: string;
+  }): PersistedRefundPolicy {
+    if (this.getActiveOrNull()) {
+      throw new Error("A refund policy already exists. Save changes to update it.");
+    }
+    const version = (input.version ?? new Date().toISOString().slice(0, 10)).trim();
+    if (!version || version.length > 80) {
+      throw new Error("Policy version is required and must be at most 80 characters.");
+    }
+    if (!Number.isInteger(input.refundWindowDays) || input.refundWindowDays < 1 || input.refundWindowDays > 365) {
+      throw new Error("Refund window must be an integer between 1 and 365 days.");
+    }
+    const rules = input.rules !== undefined
+      ? normalizeRules(input.rules)
+      : normalizeRules(cloneRules(POLICY_RULE_TEMPLATE));
+    const id = `pol_${randomUUID()}`;
+    const now = new Date().toISOString();
+    this.db.prepare("DELETE FROM refund_policy_versions WHERE status = 'DRAFT'").run();
+    this.db
+      .prepare(`INSERT INTO refund_policy_versions (
+        id, version, status, refund_window_days, rules_json, created_at, published_at
+      ) VALUES (?, ?, 'ACTIVE', ?, ?, ?, ?)`)
+      .run(id, version, input.refundWindowDays, JSON.stringify(rules), now, now);
+    return this.findById(id)!;
+  }
+
+  /** If staff left a lone draft behind, promote it so the console stays simple. */
+  activatePendingDraft(): PersistedRefundPolicy | null {
+    if (this.getActiveOrNull()) return null;
+    const draft = this.db
+      .prepare("SELECT * FROM refund_policy_versions WHERE status = 'DRAFT' ORDER BY created_at DESC LIMIT 1")
+      .get() as PolicyRow | undefined;
+    if (!draft) return null;
+    return this.publish(draft.id);
+  }
+
   createDraft(input: {
     version: string;
     refundWindowDays: number;
@@ -167,7 +206,11 @@ export class RefundPolicyRepository {
     return this.savePolicy(id, current.status, input);
   }
 
-  updateActive(input: { refundWindowDays?: number; rules?: RefundPolicyRule[] }): PersistedRefundPolicy {
+  updateActive(input: {
+    version?: string;
+    refundWindowDays?: number;
+    rules?: RefundPolicyRule[];
+  }): PersistedRefundPolicy {
     const current = this.getActiveOrNull();
     if (!current) throw new Error("No active refund policy is published.");
     return this.savePolicy(current.id, "ACTIVE", input);
