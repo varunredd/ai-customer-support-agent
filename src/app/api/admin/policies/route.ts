@@ -1,7 +1,7 @@
 import { getDatabase } from "@/db/database";
 import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 import { hasStaffApiAccess } from "@/security/admin-control";
-import { catalogRuleTemplates } from "@/domain/refunds/policy";
+import { catalogRuleTemplates, mergePolicyRulesWithCatalog, policyRulesNeedCatalogBackfill } from "@/domain/refunds/policy";
 import type { RefundPolicyRule } from "@/domain/refunds/policy";
 
 export const runtime = "nodejs";
@@ -15,8 +15,9 @@ function parseRules(body: Record<string, unknown>): RefundPolicyRule[] | undefin
 
 function backfillPolicyRules(repository: RefundPolicyRepository) {
   const active = repository.getActiveOrNull();
-  if (!active || active.rules.length > 0) return active;
-  return repository.updateActive({ rules: catalogRuleTemplates() });
+  if (!active) return null;
+  if (!policyRulesNeedCatalogBackfill(active.rules)) return active;
+  return repository.updateActive({ rules: mergePolicyRulesWithCatalog(active.rules) });
 }
 
 export async function GET() {

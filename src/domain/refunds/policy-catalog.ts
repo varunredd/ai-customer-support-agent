@@ -426,3 +426,25 @@ export function catalogRulesByCategory(): Record<PolicyRuleCategory, PolicyCatal
     return groups;
   }, {} as Record<PolicyRuleCategory, PolicyCatalogEntry[]>);
 }
+
+/** Ensure every catalog rule is present; keep saved enabled state and config. */
+export function mergePolicyRulesWithCatalog(existing: CatalogRuleTemplate[]): CatalogRuleTemplate[] {
+  const saved = new Map(existing.map((rule) => [rule.code, rule]));
+  return catalogRuleTemplates().map((template) => {
+    const current = saved.get(template.code);
+    if (!current) return template;
+    return {
+      ...template,
+      ...current,
+      title: current.title || template.title,
+      text: current.text || template.text,
+      config: current.config ?? template.config,
+    };
+  });
+}
+
+export function policyRulesNeedCatalogBackfill(existing: CatalogRuleTemplate[]) {
+  if (existing.length !== POLICY_CATALOG.length) return true;
+  const codes = new Set(existing.map((rule) => rule.code));
+  return POLICY_CATALOG.some((entry) => !codes.has(entry.code as RefundPolicyRuleCode));
+}
