@@ -40,24 +40,21 @@ export default function AdminOverviewPage() {
   return (
     <div className="admin-page">
       <div className="admin-stack">
-        <PageHeader title="Overview" description="Live operations snapshot for the policy-grounded support agent.">
-          <Link href="/support" className="primary-link">Open support chat</Link>
+        <PageHeader title="Overview">
+          <Link href="/support" className="primary-link">Open support</Link>
         </PageHeader>
 
         <div className="kpi-grid">
           <StatCard label="Customers" value={String(customerCount)} hint={`${suspended} suspended · ${highRisk} high risk`} icon={<Users size={16} />} />
-          <StatCard label="Orders in scope" value={String(orderCount)} hint="Canonical orders currently in Jobform" icon={<Activity size={16} />} />
-          <StatCard label="Agent runs today" value={String(todayRuns)} hint={`${completedToday} completed`} icon={<CheckCircle2 size={16} />} />
-          <StatCard label="Policy engine" value={activePolicy ? `${policyRuleCount} rules` : "Not published"} hint={activePolicy ? `${deniedCount} persisted deterministic denials` : "Publish a policy to enable refunds"} tone={activePolicy ? "success" : "warning"} icon={<ShieldAlert size={16} />} />
+          <StatCard label="Orders" value={String(orderCount)} hint="In Jobform" icon={<Activity size={16} />} />
+          <StatCard label="Runs today" value={String(todayRuns)} hint={`${completedToday} done`} icon={<CheckCircle2 size={16} />} />
+          <StatCard label="Policy" value={activePolicy ? `${policyRuleCount} rules` : "None"} hint={activePolicy ? `${deniedCount} denials` : "Create in Refund Policy"} tone={activePolicy ? "success" : "warning"} icon={<ShieldAlert size={16} />} />
         </div>
 
         <div className="content-grid">
           <section className="panel">
             <div className="panel-header">
-              <div>
-                <h2 className="panel-title">Recent agent runs</h2>
-                <p className="panel-subtitle">Persisted model, tool, policy, and execution activity.</p>
-              </div>
+              <h2 className="panel-title">Recent runs</h2>
               <Link href="/admin/runs" className="table-link">View all</Link>
             </div>
             <table className="table">
@@ -78,12 +75,12 @@ export default function AdminOverviewPage() {
                 ))}
               </tbody>
             </table>
-            {recentRuns.length === 0 ? <div className="state-container"><p className="state-description">No agent runs yet. Start a live support request.</p></div> : null}
+            {recentRuns.length === 0 ? <div className="state-container"><p className="state-description">No runs yet.</p></div> : null}
           </section>
 
           <section className="panel">
             <div className="panel-header">
-              <div><h2 className="panel-title">Needs attention</h2><p className="panel-subtitle">Accounts that block automated refunds.</p></div>
+              <h2 className="panel-title">Needs attention</h2>
             </div>
             <div className={styles.attentionList}>
               {attention.map((customer) => (

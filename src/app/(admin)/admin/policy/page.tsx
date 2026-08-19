@@ -13,10 +13,7 @@ export default function PolicyPage() {
   return (
     <div className="admin-page">
       <div className="admin-stack admin-stack-wide">
-        <PageHeader
-          title="Refund Policy"
-          description="Choose which refund checks NovaShop enforces. Save when done — there is no separate publish step."
-        />
+        <PageHeader title="Refund Policy" />
         <PolicyManager initialPolicy={policy} />
       </div>
     </div>

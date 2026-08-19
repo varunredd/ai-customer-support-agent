@@ -14,17 +14,17 @@
 
 .title {
   margin: 0;
-  font-size: 1.75rem;
+  font-size: 1.45rem;
   font-weight: 700;
   color: var(--text);
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
 }
 
 .description {
   margin: 0;
   color: var(--muted);
-  font-size: 1rem;
-  max-width: 680px;
+  font-size: 0.9rem;
+  max-width: 560px;
 }
 
 .actions {

@@ -81,14 +81,14 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
     }
   }
 
-  async function createPolicy(starter: "recommended" | "blank") {
+  async function createPolicy() {
     setBusy(true);
     setMessage(null);
     try {
       const response = await fetch("/api/admin/policies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refundWindowDays: 30, starter }),
+        body: JSON.stringify({ refundWindowDays: 30 }),
       });
       const payload = await response.json() as { policy?: PolicyRecord; error?: { message: string } };
       if (!response.ok) throw new Error(payload.error?.message ?? "Unable to create policy.");
@@ -97,7 +97,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
         setRules(cloneRules(payload.policy.rules));
         setRefundWindow(payload.policy.refundWindowDays);
       }
-      setMessage(starter === "blank" ? "Empty policy created — add the checks you want." : "Policy created — customize the rules below, then save.");
+      setMessage("Policy created. Turn off checks you do not want, then save.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to create policy.");
     } finally {
@@ -108,11 +108,11 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
   async function savePolicy() {
     if (!policy) return;
     if (rules.length === 0) {
-      setMessage("Add at least one rule before saving.");
+      setMessage("Add at least one check before saving.");
       return;
     }
     if (enabledCount === 0) {
-      setMessage("Enable at least one rule before saving.");
+      setMessage("Enable at least one check before saving.");
       return;
     }
     setBusy(true);
@@ -126,12 +126,17 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
       const payload = await response.json() as { error?: { message: string } };
       if (!response.ok) throw new Error(payload.error?.message ?? "Unable to save policy.");
       await refreshPolicy();
-      setMessage("Policy saved. Refund decisions use these rules immediately.");
+      setMessage("Policy saved.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save policy.");
     } finally {
       setBusy(false);
     }
+  }
+
+  function loadAllChecks() {
+    setRules(cloneRules(POLICY_RULE_TEMPLATE));
+    setMessage("All refund checks loaded. Disable or remove what does not apply to NovaShop.");
   }
 
   function updateRule(index: number, patch: Partial<RefundPolicyRule>) {
@@ -179,8 +184,8 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
             />
           </label>
           <button type="button" className={styles.ruleSummaryMain} onClick={() => setExpandedRule(isOpen ? null : rule.code)}>
-            <span className={styles.code}>{rule.code}</span>
             <span className={styles.ruleTitle}>{rule.title || RULE_LABELS[rule.code]}</span>
+            {!isOpen ? <span className={styles.rulePreview}>{rule.text}</span> : null}
           </button>
           <button type="button" className={styles.ruleExpand} aria-label={isOpen ? "Collapse" : "Expand"} onClick={() => setExpandedRule(isOpen ? null : rule.code)}>
             <ChevronDown size={16} className={clsx(styles.chevron, isOpen && styles.chevronOpen)} />
@@ -188,9 +193,10 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
         </div>
         {isOpen ? (
           <div className={styles.ruleBody}>
+            <p className={styles.ruleCode}><code>{rule.code}</code></p>
             <input className={styles.input} value={rule.title} onChange={(event) => updateRule(index, { title: event.target.value })} />
             <textarea className={styles.textarea} value={rule.text} onChange={(event) => updateRule(index, { text: event.target.value })} rows={2} />
-            <button type="button" className={styles.linkButton} onClick={() => removeRule(index)}>Remove rule</button>
+            <button type="button" className={styles.linkButton} onClick={() => removeRule(index)}>Remove check</button>
             {rule.code === "CONDITION_ALLOWED" ? (
               <div className={styles.matrix}>
                 <table className="table">
@@ -231,20 +237,10 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
         {message ? <div className={styles.notice}>{message}</div> : null}
         <section className={styles.main}>
           <div className={styles.emptyState}>
-            <h2 className={styles.emptyTitle}>Create your refund policy</h2>
-            <p className={styles.emptyText}>
-              Pick a starting point below. Every rule can be turned off, removed, or edited — nothing is locked in.
-            </p>
-            <div className={styles.createOptions}>
-              <button type="button" className={styles.button} disabled={busy} onClick={() => void createPolicy("recommended")}>
-                Start with recommended checks
-              </button>
-              <p className={styles.optionHelp}>Common e-commerce refund rules (return window, delivered orders, item condition, etc.). Customize freely.</p>
-              <button type="button" className={styles.buttonSecondary} disabled={busy} onClick={() => void createPolicy("blank")}>
-                Build from scratch
-              </button>
-              <p className={styles.optionHelp}>Empty policy — you add only the rules you want.</p>
-            </div>
+            <p className={styles.emptyText}>Set which refund checks NovaShop enforces. The support agent follows these rules exactly — it cannot approve refunds you disable here.</p>
+            <button type="button" className={styles.button} disabled={busy} onClick={() => void createPolicy()}>
+              Create refund policy
+            </button>
           </div>
         </section>
       </div>
@@ -259,7 +255,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
         <div className={styles.statusLine}>
           <StatusBadge status="SUCCESS">Live</StatusBadge>
           <p className={styles.statusText}>
-            <strong>{enabledCount}</strong> of {rules.length} checks enabled · {refundWindow}-day return window
+            <strong>{enabledCount}</strong>/{rules.length} enabled · {refundWindow}d window
           </p>
         </div>
         <button type="button" className={styles.button} disabled={busy} onClick={() => void savePolicy()}>
@@ -270,34 +266,41 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
       <section className={styles.main}>
         <div className={styles.settingsRow}>
           <label className={styles.fieldLabel}>
-            Return window (days after delivery)
+            Return window (days)
             <input className={styles.input} type="number" min={1} max={365} value={refundWindow} onChange={(event) => setRefundWindow(Number(event.target.value))} />
           </label>
         </div>
 
         <div className={styles.rulesToolbar}>
-          <span className={styles.rulesCount}>Refund checks — enabled rules are enforced on every support request</span>
-          {availableRuleCodes.length > 0 ? (
-            <select
-              className={styles.select}
-              style={{ maxWidth: 240 }}
-              defaultValue=""
-              onChange={(event) => {
-                const code = event.target.value as RefundPolicyRuleCode;
-                if (!code) return;
-                addRule(code);
-                event.target.value = "";
-              }}
-            >
-              <option value="">Add check…</option>
-              {availableRuleCodes.map((code) => <option key={code} value={code}>{RULE_LABELS[code]}</option>)}
-            </select>
-          ) : null}
+          <span className={styles.rulesCount}>Checked = enforced on every refund request</span>
+          <div className={styles.toolbarActions}>
+            {rules.length === 0 ? (
+              <button type="button" className={styles.buttonSecondary} onClick={loadAllChecks}>Load all checks</button>
+            ) : null}
+            {availableRuleCodes.length > 0 ? (
+              <select
+                className={styles.select}
+                style={{ maxWidth: 240 }}
+                defaultValue=""
+                onChange={(event) => {
+                  const code = event.target.value as RefundPolicyRuleCode;
+                  if (!code) return;
+                  addRule(code);
+                  event.target.value = "";
+                }}
+              >
+                <option value="">Add check…</option>
+                {availableRuleCodes.map((code) => <option key={code} value={code}>{RULE_LABELS[code]}</option>)}
+              </select>
+            ) : null}
+          </div>
         </div>
 
         <div className={styles.ruleList}>
           {rules.length === 0 ? (
-            <div className={styles.emptyRules}>No rules yet. Use “Add check” to build your policy.</div>
+            <div className={styles.emptyRules}>
+              No checks yet. Click <strong>Load all checks</strong>, then disable what you do not need.
+            </div>
           ) : (
             rules.map((rule, index) => renderRule(rule, index))
           )}

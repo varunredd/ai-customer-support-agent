@@ -11,16 +11,10 @@ export default function EscalationsPage() {
   return (
     <div className="admin-page">
       <div className="admin-stack">
-        <PageHeader
-          title="Human Escalations"
-          description="Durable handoffs for requests that should not be resolved autonomously. Customers should never need to repeat the full context."
-        />
+        <PageHeader title="Escalations" />
         <section className="panel">
           <div className="panel-header">
-            <div>
-              <h2 className="panel-title">Escalation queue</h2>
-              <p className="panel-subtitle">High-risk, unsupported, failed, or customer-requested handoffs.</p>
-            </div>
+            <h2 className="panel-title">Queue</h2>
           </div>
           <div className="table-container">
             <table className="table">

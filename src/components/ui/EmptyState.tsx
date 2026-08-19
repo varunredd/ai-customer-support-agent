@@ -10,8 +10,8 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({
-  title = "No data available",
-  description = "There is nothing to display here yet.",
+  title = "Nothing here",
+  description = "",
   icon = <Inbox size={22} />,
   className,
   children,
@@ -20,7 +20,7 @@ export function EmptyState({
     <div className={clsx("state-container", className)}>
       <div className="state-icon">{icon}</div>
       <h3 className="state-title">{title}</h3>
-      <p className="state-description">{description}</p>
+      {description ? <p className="state-description">{description}</p> : null}
       {children}
     </div>
   );

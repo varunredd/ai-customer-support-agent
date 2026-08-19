@@ -59,16 +59,13 @@ export default function RefundsLedgerPage() {
   return (
     <div className="admin-page">
       <div className="admin-stack">
-        <PageHeader
-          title="Refunds Ledger"
-          description="Persisted money-movement records. Policy denials stay in Agent Runs and never create ledger rows."
-        />
+        <PageHeader title="Refunds Ledger" />
 
         <div className="toolbar">
           <label className="search-field">
             <Search size={15} />
             <input
-              placeholder="Search refund ID, order, customer, or item"
+              placeholder="Search refunds"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -77,7 +74,7 @@ export default function RefundsLedgerPage() {
         </div>
 
         <div className="panel">
-          {loading ? <LoadingState message="Loading persisted refunds…" /> : error ? <ErrorState description={error} /> : (
+          {loading ? <LoadingState message="Loading…" /> : error ? <ErrorState description={error} /> : (
             <>
               <table className="table">
                 <thead>
@@ -119,10 +116,8 @@ export default function RefundsLedgerPage() {
               </table>
               {visible.length === 0 ? (
                 <EmptyState
-                  title={refunds.length === 0 ? "No refunds processed yet" : "No matching refunds"}
-                  description={refunds.length === 0
-                    ? "An approved live support request will appear here after atomic execution."
-                    : "Try a different refund ID, customer, order, or item."}
+                  title={refunds.length === 0 ? "No refunds yet" : "No matches"}
+                  description={refunds.length === 0 ? "Approved refunds appear here." : "Try another search."}
                 />
               ) : null}
             </>

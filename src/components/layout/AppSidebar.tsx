@@ -47,7 +47,7 @@ export function AppSidebar() {
           </div>
           <div>
             <span className={styles.logoText}>Jobform</span>
-            <span className={styles.logoSub}>Support operations</span>
+            <span className={styles.logoSub}>Admin</span>
           </div>
         </div>
       </div>
@@ -69,7 +69,7 @@ export function AppSidebar() {
           </Link>
           <Link href="/admin/runs" className={clsx(styles.navItem, pathname.startsWith("/admin/runs") && styles.navItemActive)}>
             <Activity size={16} />
-            Agent Runs
+            Runs
           </Link>
           <Link href="/admin/customers" className={clsx(styles.navItem, pathname.startsWith("/admin/customers") && styles.navItemActive)}>
             <Users size={16} />
@@ -77,7 +77,7 @@ export function AppSidebar() {
           </Link>
           <Link href="/admin/refunds" className={clsx(styles.navItem, pathname.startsWith("/admin/refunds") && styles.navItemActive)}>
             <Receipt size={16} />
-            Refunds Ledger
+            Refunds
           </Link>
           <Link href="/admin/escalations" className={clsx(styles.navItem, pathname.startsWith("/admin/escalations") && styles.navItemActive)}>
             <UserRoundCheck size={16} />

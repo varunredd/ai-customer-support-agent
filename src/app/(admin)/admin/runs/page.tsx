@@ -36,7 +36,7 @@ function badgeStatus(status: PersistedAgentRun["status"]) {
 
 export default function AgentRunsPage() {
   return (
-    <Suspense fallback={<div className="admin-page-fill"><LoadingState message="Loading persisted agent runs…" /></div>}>
+    <Suspense fallback={<div className="admin-page-fill"><LoadingState message="Loading…" /></div>}>
       <AgentRunsPageInner />
     </Suspense>
   );
@@ -188,7 +188,7 @@ function AgentRunsPageInner() {
   const selectedSummary = runs.find((run) => run.id === selectedRunId) ?? null;
 
   if (loading) {
-    return <div className="admin-page-fill"><LoadingState message="Loading persisted agent runs…" /></div>;
+    return <div className="admin-page-fill"><LoadingState message="Loading…" /></div>;
   }
   if (error && runs.length === 0) {
     return (
@@ -204,10 +204,7 @@ function AgentRunsPageInner() {
   return (
     <div className="admin-page-fill">
       <div className={styles.page}>
-        <PageHeader
-          title="Agent Runs"
-          description="Live structured observability for model turns, tool calls, policy checks, retries, and refund execution."
-        >
+        <PageHeader title="Agent Runs">
           <button className={styles.refreshButton} type="button" onClick={() => void refreshAll()}>
             <RefreshCcw size={14} /> Refresh
           </button>
@@ -245,7 +242,7 @@ function AgentRunsPageInner() {
                   ) : null}
                 </button>
               ))}
-              {runs.length === 0 ? <div className={styles.emptyState}>No persisted runs yet. Send a message from Support Chat.</div> : null}
+              {runs.length === 0 ? <div className={styles.emptyState}>No runs yet.</div> : null}
             </div>
           </div>
 
@@ -256,7 +253,7 @@ function AgentRunsPageInner() {
               <>
                 <div className={styles.detailHeader}>
                   <div>
-                    <p className={styles.detailKicker}>Execution timeline</p>
+                    <p className={styles.detailKicker}>Timeline</p>
                     <h3 className={styles.detailTitle}>{selectedRun.id}</h3>
                     <div className={styles.metaRow}>
                       <span>{selectedSummary?.customerName ?? selectedRun.customerId ?? "Customer pending"}</span>
@@ -286,7 +283,7 @@ function AgentRunsPageInner() {
                 </div>
               </>
             ) : (
-              <div className={styles.emptyState}>Select a persisted run to inspect its timeline.</div>
+              <div className={styles.emptyState}>Select a run.</div>
             )}
           </div>
         </div>
