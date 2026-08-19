@@ -25,5 +25,4 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --chown=root:root docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 EXPOSE 3000
-VOLUME ["/app/.data"]
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
