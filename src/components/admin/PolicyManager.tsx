@@ -6,11 +6,17 @@ import { ChevronDown } from "lucide-react";
 import {
   DEFAULT_CONDITION_ALLOWED,
   ITEM_CONDITIONS,
-  POLICY_RULE_TEMPLATE,
   REFUND_REASONS,
+  catalogRuleTemplates,
   type RefundPolicyRule,
   type RefundPolicyRuleCode,
 } from "@/domain/refunds/policy";
+import {
+  POLICY_CATALOG,
+  catalogEntry,
+  catalogRulesByCategory,
+  type PolicyRuleCategory,
+} from "@/domain/refunds/policy-catalog";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import styles from "@/app/(admin)/admin/policy/page.module.css";
 
@@ -28,18 +34,11 @@ interface PolicyManagerProps {
   initialPolicy: PolicyRecord | null;
 }
 
-const RULE_LABELS: Record<RefundPolicyRuleCode, string> = {
-  ACCOUNT_ACTIVE: "Account must be active",
-  RISK_NOT_HIGH: "Block high-risk accounts",
-  ORDER_OWNERSHIP: "Customer must own the order",
-  ORDER_DELIVERED: "Order must be delivered",
-  WITHIN_WINDOW: "Within return window",
-  ITEM_REFUNDABLE: "Item must be refundable",
-  NOT_FINAL_SALE: "No final-sale items",
-  VALID_QUANTITY: "Valid refund quantity",
-  CONDITION_ALLOWED: "Item condition rules",
-  REMAINING_BALANCE: "No over-refunding",
-};
+const RULE_LABELS = Object.fromEntries(
+  POLICY_CATALOG.map((entry) => [entry.code, entry.title]),
+) as Record<RefundPolicyRuleCode, string>;
+
+const RULES_BY_CATEGORY = catalogRulesByCategory();
 
 function conditionConfig(rule: RefundPolicyRule) {
   const configured = rule.config?.allowedConditionsByReason;
@@ -66,7 +65,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
 
   const availableRuleCodes = useMemo(() => {
     const used = new Set(rules.map((rule) => rule.code));
-    return POLICY_RULE_TEMPLATE.map((rule) => rule.code).filter((code) => !used.has(code));
+    return POLICY_CATALOG.map((entry) => entry.code as RefundPolicyRuleCode).filter((code) => !used.has(code));
   }, [rules]);
 
   const enabledCount = rules.filter((rule) => rule.enabled).length;
@@ -135,7 +134,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
   }
 
   function loadAllChecks() {
-    setRules(cloneRules(POLICY_RULE_TEMPLATE));
+    setRules(cloneRules(catalogRuleTemplates()));
     setMessage("All refund checks loaded. Disable or remove what does not apply to NovaShop.");
   }
 
@@ -149,7 +148,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
   }
 
   function addRule(code: RefundPolicyRuleCode) {
-    const template = POLICY_RULE_TEMPLATE.find((rule) => rule.code === code);
+    const template = catalogRuleTemplates().find((rule) => rule.code === code);
     if (!template) return;
     setRules((current) => [...current, cloneRules([template])[0]!]);
     setExpandedRule(code);
@@ -184,7 +183,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
             />
           </label>
           <button type="button" className={styles.ruleSummaryMain} onClick={() => setExpandedRule(isOpen ? null : rule.code)}>
-            <span className={styles.ruleTitle}>{rule.title || RULE_LABELS[rule.code]}</span>
+            <span className={styles.ruleTitle}>{rule.title || RULE_LABELS[rule.code] || catalogEntry(rule.code).title}</span>
             {!isOpen ? <span className={styles.rulePreview}>{rule.text}</span> : null}
           </button>
           <button type="button" className={styles.ruleExpand} aria-label={isOpen ? "Collapse" : "Expand"} onClick={() => setExpandedRule(isOpen ? null : rule.code)}>
@@ -290,7 +289,17 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
                 }}
               >
                 <option value="">Add check…</option>
-                {availableRuleCodes.map((code) => <option key={code} value={code}>{RULE_LABELS[code]}</option>)}
+                {(Object.keys(RULES_BY_CATEGORY) as PolicyRuleCategory[]).map((category) => {
+                  const entries = RULES_BY_CATEGORY[category].filter((entry) => availableRuleCodes.includes(entry.code as RefundPolicyRuleCode));
+                  if (entries.length === 0) return null;
+                  return (
+                    <optgroup key={category} label={category}>
+                      {entries.map((entry) => (
+                        <option key={entry.code} value={entry.code}>{entry.title}</option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
               </select>
             ) : null}
           </div>

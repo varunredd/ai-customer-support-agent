@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { AppDatabase } from "@/db/database";
 import {
   buildPolicyDefinition,
-  POLICY_RULE_TEMPLATE,
+  catalogRuleTemplates,
   type RefundPolicyDefinition,
   type RefundPolicyRule,
   type RefundPolicyRuleCode,
 } from "@/domain/refunds/policy";
+import { POLICY_RULE_CODES } from "@/domain/refunds/policy-catalog";
 
 export type RefundPolicyStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 
@@ -35,7 +36,7 @@ interface PolicyRow {
   published_at: string | null;
 }
 
-const RULE_CODES = new Set<RefundPolicyRuleCode>(POLICY_RULE_TEMPLATE.map((rule) => rule.code));
+const RULE_CODES = new Set<RefundPolicyRuleCode>(POLICY_RULE_CODES);
 
 function cloneRules(rules: RefundPolicyRule[]): RefundPolicyRule[] {
   return rules.map((rule) => ({
@@ -137,7 +138,7 @@ export class RefundPolicyRepository {
     }
     const rules = input.rules !== undefined
       ? normalizeRules(input.rules)
-      : normalizeRules(cloneRules(POLICY_RULE_TEMPLATE));
+      : normalizeRules(cloneRules(catalogRuleTemplates()));
     const id = `pol_${randomUUID()}`;
     const now = new Date().toISOString();
     this.db.prepare("DELETE FROM refund_policy_versions WHERE status = 'DRAFT'").run();
@@ -178,7 +179,7 @@ export class RefundPolicyRepository {
       rules = cloneRules(source.rules);
     }
     if (!rules) {
-      rules = cloneRules(POLICY_RULE_TEMPLATE);
+      rules = cloneRules(catalogRuleTemplates());
     }
 
     const normalized = normalizeRules(rules);
@@ -269,4 +270,4 @@ export class RefundPolicyRepository {
   }
 }
 
-export { buildPolicyDefinition, POLICY_RULE_TEMPLATE };
+export { buildPolicyDefinition, catalogRuleTemplates };
