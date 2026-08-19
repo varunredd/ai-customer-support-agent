@@ -14,8 +14,9 @@ function parseRules(body: Record<string, unknown>): RefundPolicyRule[] | undefin
 
 export async function GET() {
   const repository = new RefundPolicyRepository(getDatabase());
+  repository.activatePendingDraft();
   const active = repository.getActiveOrNull();
-  return Response.json({ policies: repository.list(), activePolicyId: active?.id ?? null });
+  return Response.json({ policy: active });
 }
 
 export async function POST(request: Request) {
@@ -24,19 +25,19 @@ export async function POST(request: Request) {
   }
   try {
     const body = await request.json() as Record<string, unknown>;
-    if (typeof body.version !== "string" || typeof body.refundWindowDays !== "number") {
-      throw new Error("version and refundWindowDays are required.");
+    if (typeof body.refundWindowDays !== "number") {
+      throw new Error("refundWindowDays is required.");
     }
-    const policy = new RefundPolicyRepository(getDatabase()).createDraft({
-      version: body.version,
+    const starter = body.starter === "blank" ? "blank" : "recommended";
+    const rules = parseRules(body) ?? (starter === "blank" ? [] : undefined);
+    const policy = new RefundPolicyRepository(getDatabase()).createActive({
       refundWindowDays: body.refundWindowDays,
-      rules: parseRules(body),
-      sourcePolicyId: typeof body.sourcePolicyId === "string" ? body.sourcePolicyId : undefined,
+      rules,
     });
     return Response.json({ policy }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to create policy draft.";
-    const conflict = /UNIQUE constraint/i.test(message);
-    return Response.json({ error: { code: conflict ? "POLICY_VERSION_EXISTS" : "INVALID_POLICY", message } }, { status: conflict ? 409 : 400 });
+    const message = error instanceof Error ? error.message : "Unable to create policy.";
+    const conflict = /UNIQUE constraint/i.test(message) || /already exists/i.test(message);
+    return Response.json({ error: { code: conflict ? "POLICY_EXISTS" : "INVALID_POLICY", message } }, { status: conflict ? 409 : 400 });
   }
 }

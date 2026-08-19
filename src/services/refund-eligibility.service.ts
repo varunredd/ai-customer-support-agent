@@ -34,6 +34,14 @@ export function evaluateRefundEligibility(
     : null;
   const policy = context.policy;
   const activeRules = enabledRuleCodes(policy);
+  if (policy.rules.length === 0 || activeRules.size === 0) {
+    return {
+      decision: "DENY",
+      refundAmountCents: 0,
+      checks: [check("POLICY_CONFIGURED", false, "At least one refund rule must be enabled.", { enabledRuleCount: activeRules.size })],
+      denialReasons: ["POLICY_CONFIGURED: At least one refund rule must be enabled."],
+    };
+  }
   const alreadyRefundedItemQuantity = Math.max(0, context.alreadyRefundedItemQuantity ?? 0);
   const remainingItemQuantity = item ? Math.max(0, item.quantity - alreadyRefundedItemQuantity) : 0;
   const itemRefundCents = item ? item.unitPriceCents * request.quantity : 0;

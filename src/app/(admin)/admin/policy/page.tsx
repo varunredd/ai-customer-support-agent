@@ -7,20 +7,17 @@ export const dynamic = "force-dynamic";
 
 export default function PolicyPage() {
   const repository = new RefundPolicyRepository(getDatabase());
-  const policies = repository.list();
-  const active = repository.getActiveOrNull();
+  repository.activatePendingDraft();
+  const policy = repository.getActiveOrNull();
 
   return (
     <div className="admin-page">
       <div className="admin-stack admin-stack-wide">
         <PageHeader
           title="Refund Policy"
-          description="Configure machine-checkable refund rules. NovaShop customers and orders sync automatically in the background."
+          description="Choose which refund checks NovaShop enforces. Save when done — there is no separate publish step."
         />
-        <PolicyManager
-          initialPolicies={policies}
-          activePolicyId={active?.id ?? null}
-        />
+        <PolicyManager initialPolicy={policy} />
       </div>
     </div>
   );
