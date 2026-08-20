@@ -1,6 +1,7 @@
 import type { AppDatabase } from "@/db/database";
 import type { Customer, Order, OrderItem } from "@/domain/refunds/types";
 import type { CustomerRepository, OrderRepository } from "@/repositories/contracts";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 interface CustomerRow {
   id: string;
@@ -84,41 +85,47 @@ function mapOrder(db: AppDatabase, row: OrderRow): Order {
   };
 }
 
-export function createSqliteCustomerRepository(db: AppDatabase): CustomerRepository {
+export function createSqliteCustomerRepository(db: AppDatabase, tenantId?: string): CustomerRepository {
+  const tenant = resolveTenantId(db, tenantId);
   return {
     async findById(id) {
-      const row = db.prepare("SELECT * FROM customers WHERE id = ?").get(id) as CustomerRow | undefined;
+      const row = db.prepare("SELECT * FROM customers WHERE tenant_id = ? AND id = ?").get(tenant, id) as
+        | CustomerRow
+        | undefined;
       return row ? mapCustomer(row) : null;
     },
     async findByEmail(email) {
-      const row = db.prepare("SELECT * FROM customers WHERE email = ? COLLATE NOCASE").get(email) as
+      const row = db.prepare("SELECT * FROM customers WHERE tenant_id = ? AND email = ? COLLATE NOCASE").get(tenant, email) as
         | CustomerRow
         | undefined;
       return row ? mapCustomer(row) : null;
     },
     async listAll() {
-      const rows = db.prepare("SELECT * FROM customers ORDER BY name").all() as CustomerRow[];
+      const rows = db.prepare("SELECT * FROM customers WHERE tenant_id = ? ORDER BY name").all(tenant) as CustomerRow[];
       return rows.map(mapCustomer);
     },
   };
 }
 
-export function createSqliteOrderRepository(db: AppDatabase): OrderRepository {
+export function createSqliteOrderRepository(db: AppDatabase, tenantId?: string): OrderRepository {
+  const tenant = resolveTenantId(db, tenantId);
   return {
     async findById(id) {
-      const row = db.prepare("SELECT * FROM orders WHERE id = ?").get(id) as OrderRow | undefined;
+      const row = db.prepare("SELECT * FROM orders WHERE tenant_id = ? AND id = ?").get(tenant, id) as
+        | OrderRow
+        | undefined;
       return row ? mapOrder(db, row) : null;
     },
     async findForCustomer(orderId, customerId) {
       const row = db
-        .prepare("SELECT * FROM orders WHERE id = ? AND customer_id = ?")
-        .get(orderId, customerId) as OrderRow | undefined;
+        .prepare("SELECT * FROM orders WHERE tenant_id = ? AND id = ? AND customer_id = ?")
+        .get(tenant, orderId, customerId) as OrderRow | undefined;
       return row ? mapOrder(db, row) : null;
     },
     async listForCustomer(customerId) {
       const rows = db
-        .prepare("SELECT * FROM orders WHERE customer_id = ? ORDER BY placed_at DESC")
-        .all(customerId) as OrderRow[];
+        .prepare("SELECT * FROM orders WHERE tenant_id = ? AND customer_id = ? ORDER BY placed_at DESC")
+        .all(tenant, customerId) as OrderRow[];
       return rows.map((row) => mapOrder(db, row));
     },
   };

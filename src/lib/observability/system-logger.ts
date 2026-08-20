@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AppDatabase } from "@/db/database";
 import { redactMetadata } from "@/lib/security/redaction";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 export type LogSeverity = "INFO" | "WARN" | "ERROR";
 
@@ -35,11 +36,13 @@ export function operationalLog(input: OperationalEventInput, db?: AppDatabase) {
 
   if (!db) return;
   try {
+    const tenantId = resolveTenantId(db);
     db.prepare(`INSERT INTO operational_events (
-      id, severity, source, code, message, request_id, run_id, metadata_json, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      id, tenant_id, severity, source, code, message, request_id, run_id, metadata_json, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(
         `ops_${randomUUID()}`,
+        tenantId,
         input.severity,
         input.source,
         input.code,
@@ -60,11 +63,12 @@ export function operationalLog(input: OperationalEventInput, db?: AppDatabase) {
   }
 }
 
-export function listOperationalEvents(db: AppDatabase, limit = 100) {
+export function listOperationalEvents(db: AppDatabase, limit = 100, tenantId?: string) {
+  const tenant = resolveTenantId(db, tenantId);
   const safeLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
   return db.prepare(`SELECT id, severity, source, code, message, request_id AS requestId,
     run_id AS runId, metadata_json AS metadataJson, created_at AS createdAt
-    FROM operational_events ORDER BY created_at DESC LIMIT ?`).all(safeLimit) as Array<{
+    FROM operational_events WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?`).all(tenant, safeLimit) as Array<{
       id: string;
       severity: LogSeverity;
       source: string;

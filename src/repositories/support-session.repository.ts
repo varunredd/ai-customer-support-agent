@@ -6,6 +6,7 @@ import type {
   SupportSession,
   SupportSessionStatus,
 } from "@/domain/support/types";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 interface SupportSessionRow {
   id: string;
@@ -48,23 +49,30 @@ function mapMessage(row: SupportMessageRow): SupportMessage {
 }
 
 export class SupportSessionRepository {
-  constructor(private readonly db: AppDatabase) {}
+  private readonly tenantId: string;
+
+  constructor(
+    private readonly db: AppDatabase,
+    tenantId?: string,
+  ) {
+    this.tenantId = resolveTenantId(db, tenantId);
+  }
 
   create(input: { customerId: string; orderId: string; accessTokenHash?: string | null; id?: string; createdAt?: string }): SupportSession {
     const id = input.id ?? `ses_${randomUUID()}`;
     const now = input.createdAt ?? new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO support_sessions (id, customer_id, order_id, status, access_token_hash, created_at, updated_at)
-         VALUES (?, ?, ?, 'OPEN', ?, ?, ?)`,
+        `INSERT INTO support_sessions (id, tenant_id, customer_id, order_id, status, access_token_hash, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'OPEN', ?, ?, ?)`,
       )
-      .run(id, input.customerId, input.orderId, input.accessTokenHash ?? null, now, now);
+      .run(id, this.tenantId, input.customerId, input.orderId, input.accessTokenHash ?? null, now, now);
 
     return this.findById(id)!;
   }
 
   findById(id: string): SupportSession | null {
-    const row = this.db.prepare("SELECT * FROM support_sessions WHERE id = ?").get(id) as
+    const row = this.db.prepare("SELECT * FROM support_sessions WHERE tenant_id = ? AND id = ?").get(this.tenantId, id) as
       | SupportSessionRow
       | undefined;
     return row ? mapSession(row) : null;

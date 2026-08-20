@@ -4,6 +4,7 @@ import { getApplicationRepositories } from "@/repositories";
 import { RefundPolicyNotFoundError, RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 import { evaluateRefundEligibility } from "@/services/refund-eligibility.service";
 import { executeRefundAtomically } from "@/services/refund-execution.service";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 export async function lookupCustomerByEmail(email: string) {
   const { customerRepository } = getApplicationRepositories();
@@ -49,8 +50,8 @@ export async function validateRefundRequest(request: RefundRequest) {
   }
 
   const refunded = db
-    .prepare("SELECT COALESCE(SUM(quantity), 0) AS quantity FROM refunds WHERE item_id = ?")
-    .get(request.itemId) as { quantity: number };
+    .prepare("SELECT COALESCE(SUM(quantity), 0) AS quantity FROM refunds WHERE tenant_id = ? AND item_id = ?")
+    .get(resolveTenantId(db), request.itemId) as { quantity: number };
 
   const evaluation = evaluateRefundEligibility(customer, order, request, {
     alreadyRefundedItemQuantity: refunded.quantity,

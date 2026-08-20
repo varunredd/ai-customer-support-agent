@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { AppDatabase } from "@/db/database";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 export type SupportEntry = "portal" | "host" | "all";
 
@@ -137,8 +138,9 @@ function bearerToken(request: Request) {
   return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
 }
 
-export function assertSupportSessionAccess(db: AppDatabase, sessionId: string, request: Request) {
-  const row = db.prepare("SELECT access_token_hash FROM support_sessions WHERE id = ?").get(sessionId) as
+export function assertSupportSessionAccess(db: AppDatabase, sessionId: string, request: Request, tenantId?: string) {
+  const tenant = resolveTenantId(db, tenantId);
+  const row = db.prepare("SELECT access_token_hash FROM support_sessions WHERE tenant_id = ? AND id = ?").get(tenant, sessionId) as
     | { access_token_hash: string | null }
     | undefined;
   if (!row) throw new SupportAccessError("SUPPORT_SESSION_NOT_FOUND", "Support session was not found.");

@@ -245,6 +245,183 @@ export const MIGRATIONS: DatabaseMigration[] = [
         ON request_rate_limits(updated_at);
     `,
   },
+
+  {
+    version: 4,
+    name: "phase7_tenant_kernel",
+    sql: `
+      CREATE TABLE tenants (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'SUSPENDED')),
+        settings_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      INSERT INTO tenants (id, name, slug, status, settings_json, created_at, updated_at)
+      VALUES ('ten_default', 'Default Merchant', 'default', 'ACTIVE', '{}', datetime('now'), datetime('now'));
+
+      ALTER TABLE customers ADD COLUMN tenant_id TEXT REFERENCES tenants(id);
+      ALTER TABLE orders ADD COLUMN tenant_id TEXT REFERENCES tenants(id);
+      ALTER TABLE agent_runs ADD COLUMN tenant_id TEXT REFERENCES tenants(id);
+      ALTER TABLE refunds ADD COLUMN tenant_id TEXT REFERENCES tenants(id);
+      ALTER TABLE support_sessions ADD COLUMN tenant_id TEXT REFERENCES tenants(id);
+      ALTER TABLE refund_policy_versions ADD COLUMN tenant_id TEXT REFERENCES tenants(id);
+      ALTER TABLE notification_outbox ADD COLUMN tenant_id TEXT REFERENCES tenants(id);
+      ALTER TABLE support_escalations ADD COLUMN tenant_id TEXT REFERENCES tenants(id);
+      ALTER TABLE operational_events ADD COLUMN tenant_id TEXT REFERENCES tenants(id);
+      ALTER TABLE integration_events ADD COLUMN tenant_id TEXT REFERENCES tenants(id);
+
+      UPDATE customers SET tenant_id = 'ten_default' WHERE tenant_id IS NULL;
+      UPDATE orders SET tenant_id = 'ten_default' WHERE tenant_id IS NULL;
+      UPDATE agent_runs SET tenant_id = 'ten_default' WHERE tenant_id IS NULL;
+      UPDATE refunds SET tenant_id = 'ten_default' WHERE tenant_id IS NULL;
+      UPDATE support_sessions SET tenant_id = 'ten_default' WHERE tenant_id IS NULL;
+      UPDATE refund_policy_versions SET tenant_id = 'ten_default' WHERE tenant_id IS NULL;
+      UPDATE notification_outbox SET tenant_id = 'ten_default' WHERE tenant_id IS NULL;
+      UPDATE support_escalations SET tenant_id = 'ten_default' WHERE tenant_id IS NULL;
+      UPDATE operational_events SET tenant_id = 'ten_default' WHERE tenant_id IS NULL;
+      UPDATE integration_events SET tenant_id = 'ten_default' WHERE tenant_id IS NULL;
+
+      CREATE INDEX idx_orders_tenant_id ON orders(tenant_id);
+      CREATE INDEX idx_agent_runs_tenant_id ON agent_runs(tenant_id);
+      CREATE INDEX idx_refunds_tenant_id ON refunds(tenant_id);
+      CREATE INDEX idx_support_sessions_tenant_id ON support_sessions(tenant_id);
+      CREATE INDEX idx_refund_policy_tenant_id ON refund_policy_versions(tenant_id);
+      CREATE INDEX idx_notification_outbox_tenant_id ON notification_outbox(tenant_id);
+      CREATE INDEX idx_support_escalations_tenant_id ON support_escalations(tenant_id);
+      CREATE INDEX idx_operational_events_tenant_id ON operational_events(tenant_id);
+      CREATE INDEX idx_integration_events_tenant_id ON integration_events(tenant_id);
+
+      DROP INDEX IF EXISTS idx_refund_policy_single_active;
+      CREATE UNIQUE INDEX idx_refund_policy_tenant_active
+        ON refund_policy_versions(tenant_id) WHERE status = 'ACTIVE';
+
+      CREATE TABLE customers_tenant_scoped (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id),
+        name TEXT NOT NULL,
+        email TEXT NOT NULL COLLATE NOCASE,
+        account_status TEXT NOT NULL CHECK (account_status IN ('ACTIVE', 'SUSPENDED')),
+        risk_level TEXT NOT NULL CHECK (risk_level IN ('LOW', 'MEDIUM', 'HIGH')),
+        lifetime_orders INTEGER NOT NULL CHECK (lifetime_orders >= 0),
+        lifetime_refunds INTEGER NOT NULL CHECK (lifetime_refunds >= 0),
+        created_at TEXT NOT NULL
+      );
+
+      INSERT INTO customers_tenant_scoped (
+        id, tenant_id, name, email, account_status, risk_level, lifetime_orders, lifetime_refunds, created_at
+      )
+      SELECT id, tenant_id, name, email, account_status, risk_level, lifetime_orders, lifetime_refunds, created_at
+      FROM customers;
+
+      PRAGMA foreign_keys = OFF;
+      DROP TABLE customers;
+      ALTER TABLE customers_tenant_scoped RENAME TO customers;
+      PRAGMA foreign_keys = ON;
+
+      CREATE INDEX idx_customers_tenant_id ON customers(tenant_id);
+      CREATE UNIQUE INDEX idx_customers_tenant_email ON customers(tenant_id, email COLLATE NOCASE);
+
+      CREATE TABLE refunds_tenant_scoped (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id),
+        idempotency_key TEXT NOT NULL,
+        request_fingerprint TEXT NOT NULL,
+        run_id TEXT REFERENCES agent_runs(id),
+        customer_id TEXT NOT NULL REFERENCES customers(id),
+        order_id TEXT NOT NULL REFERENCES orders(id),
+        item_id TEXT NOT NULL REFERENCES order_items(id),
+        quantity INTEGER NOT NULL CHECK (quantity > 0),
+        reason TEXT NOT NULL,
+        condition TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+        currency TEXT NOT NULL CHECK (currency = 'USD'),
+        status TEXT NOT NULL CHECK (status = 'COMPLETED'),
+        policy_version TEXT,
+        evaluation_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, idempotency_key)
+      );
+
+      INSERT INTO refunds_tenant_scoped (
+        id, tenant_id, idempotency_key, request_fingerprint, run_id, customer_id, order_id, item_id,
+        quantity, reason, condition, amount_cents, currency, status, policy_version, evaluation_json, created_at
+      )
+      SELECT
+        id, tenant_id, idempotency_key, request_fingerprint, run_id, customer_id, order_id, item_id,
+        quantity, reason, condition, amount_cents, currency, status, policy_version, evaluation_json, created_at
+      FROM refunds;
+
+      CREATE TABLE integration_events_tenant_scoped (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id),
+        source TEXT NOT NULL,
+        external_event_id TEXT NOT NULL,
+        payload_hash TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('PROCESSED', 'REJECTED')),
+        error_code TEXT,
+        created_at TEXT NOT NULL,
+        processed_at TEXT NOT NULL,
+        UNIQUE(tenant_id, external_event_id)
+      );
+
+      INSERT INTO integration_events_tenant_scoped (
+        id, tenant_id, source, external_event_id, payload_hash, status, error_code, created_at, processed_at
+      )
+      SELECT id, tenant_id, source, external_event_id, payload_hash, status, error_code, created_at, processed_at
+      FROM integration_events;
+
+      CREATE TABLE notification_outbox_tenant_scoped (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id),
+        event_key TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        recipient TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('PENDING', 'SENT', 'DEAD')),
+        attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+        next_attempt_at TEXT NOT NULL,
+        provider_message_id TEXT,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        sent_at TEXT,
+        UNIQUE(tenant_id, event_key)
+      );
+
+      INSERT INTO notification_outbox_tenant_scoped (
+        id, tenant_id, event_key, event_type, recipient, subject, payload_json, status,
+        attempts, next_attempt_at, provider_message_id, last_error, created_at, updated_at, sent_at
+      )
+      SELECT
+        id, tenant_id, event_key, event_type, recipient, subject, payload_json, status,
+        attempts, next_attempt_at, provider_message_id, last_error, created_at, updated_at, sent_at
+      FROM notification_outbox;
+
+      PRAGMA foreign_keys = OFF;
+      DROP TABLE refunds;
+      ALTER TABLE refunds_tenant_scoped RENAME TO refunds;
+      DROP TABLE integration_events;
+      ALTER TABLE integration_events_tenant_scoped RENAME TO integration_events;
+      DROP TABLE notification_outbox;
+      ALTER TABLE notification_outbox_tenant_scoped RENAME TO notification_outbox;
+      PRAGMA foreign_keys = ON;
+
+      CREATE INDEX idx_refunds_tenant_id ON refunds(tenant_id);
+      CREATE INDEX idx_refunds_order_id ON refunds(order_id, created_at DESC);
+      CREATE INDEX idx_refunds_customer_id ON refunds(customer_id, created_at DESC);
+      CREATE INDEX idx_refunds_item_id ON refunds(item_id);
+      CREATE INDEX idx_integration_events_tenant_id ON integration_events(tenant_id);
+      CREATE INDEX idx_integration_events_created_at ON integration_events(created_at DESC);
+      CREATE INDEX idx_notification_outbox_tenant_id ON notification_outbox(tenant_id);
+      CREATE INDEX idx_notification_outbox_dispatch
+        ON notification_outbox(status, next_attempt_at, created_at);
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.at(-1)?.version ?? 0;

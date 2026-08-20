@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 import { formatTime } from "@/lib/format";
 import { AdminReadRepository } from "@/repositories/admin-read.repository";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 import styles from "./overview.module.css";
 
 export const runtime = "nodejs";
@@ -22,20 +23,24 @@ interface AttentionRow {
 
 export default function AdminOverviewPage() {
   const db = getDatabase();
-  const read = new AdminReadRepository(db);
+  const tenantId = resolveTenantId(db);
+  const read = new AdminReadRepository(db, tenantId);
   const recentRuns = read.listRunSummaries(5);
-  const customerCount = (db.prepare("SELECT COUNT(*) AS count FROM customers").get() as { count: number }).count;
-  const orderCount = (db.prepare("SELECT COUNT(*) AS count FROM orders").get() as { count: number }).count;
-  const suspended = (db.prepare("SELECT COUNT(*) AS count FROM customers WHERE account_status = 'SUSPENDED'").get() as { count: number }).count;
-  const highRisk = (db.prepare("SELECT COUNT(*) AS count FROM customers WHERE risk_level = 'HIGH'").get() as { count: number }).count;
-  const todayRuns = (db.prepare("SELECT COUNT(*) AS count FROM agent_runs WHERE date(started_at) = date('now')").get() as { count: number }).count;
-  const completedToday = (db.prepare("SELECT COUNT(*) AS count FROM agent_runs WHERE date(started_at) = date('now') AND status = 'COMPLETED'").get() as { count: number }).count;
-  const activePolicy = new RefundPolicyRepository(db).getActiveOrNull();
+  const customerCount = (db.prepare("SELECT COUNT(*) AS count FROM customers WHERE tenant_id = ?").get(tenantId) as { count: number }).count;
+  const orderCount = (db.prepare("SELECT COUNT(*) AS count FROM orders WHERE tenant_id = ?").get(tenantId) as { count: number }).count;
+  const suspended = (db.prepare("SELECT COUNT(*) AS count FROM customers WHERE tenant_id = ? AND account_status = 'SUSPENDED'").get(tenantId) as { count: number }).count;
+  const highRisk = (db.prepare("SELECT COUNT(*) AS count FROM customers WHERE tenant_id = ? AND risk_level = 'HIGH'").get(tenantId) as { count: number }).count;
+  const todayRuns = (db.prepare("SELECT COUNT(*) AS count FROM agent_runs WHERE tenant_id = ? AND date(started_at) = date('now')").get(tenantId) as { count: number }).count;
+  const completedToday = (db.prepare("SELECT COUNT(*) AS count FROM agent_runs WHERE tenant_id = ? AND date(started_at) = date('now') AND status = 'COMPLETED'").get(tenantId) as { count: number }).count;
+  const activePolicy = new RefundPolicyRepository(db, tenantId).getActiveOrNull();
   const policyRuleCount = activePolicy?.rules.filter((rule) => rule.enabled).length ?? 0;
-  const deniedCount = (db.prepare("SELECT COUNT(*) AS count FROM agent_events WHERE type = 'DECISION' AND status = 'FAILED'").get() as { count: number }).count;
+  const deniedCount = (db.prepare(`SELECT COUNT(*) AS count
+    FROM agent_events e
+    JOIN agent_runs ar ON ar.id = e.run_id
+    WHERE ar.tenant_id = ? AND e.type = 'DECISION' AND e.status = 'FAILED'`).get(tenantId) as { count: number }).count;
   const attention = db
-    .prepare("SELECT id, name, email, account_status, risk_level FROM customers WHERE risk_level = 'HIGH' OR account_status = 'SUSPENDED' ORDER BY name")
-    .all() as AttentionRow[];
+    .prepare("SELECT id, name, email, account_status, risk_level FROM customers WHERE tenant_id = ? AND (risk_level = 'HIGH' OR account_status = 'SUSPENDED') ORDER BY name")
+    .all(tenantId) as AttentionRow[];
 
   return (
     <div className="admin-page">

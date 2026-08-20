@@ -1,5 +1,6 @@
 import type { AppDatabase } from "@/db/database";
 import type { AgentEventStatus, AgentRunStatus } from "@/domain/agent/types";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 export interface AdminRefundListItem {
   id: string;
@@ -77,7 +78,14 @@ function parseDecision(value: string | null): { decision: "APPROVE" | "DENY" | n
 }
 
 export class AdminReadRepository {
-  constructor(private readonly db: AppDatabase) {}
+  private readonly tenantId: string;
+
+  constructor(
+    private readonly db: AppDatabase,
+    tenantId?: string,
+  ) {
+    this.tenantId = resolveTenantId(db, tenantId);
+  }
 
   listRefunds(limit = 100): AdminRefundListItem[] {
     const safeLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
@@ -86,12 +94,13 @@ export class AdminReadRepository {
         `SELECT r.id, r.run_id, r.customer_id, c.name AS customer_name, r.order_id, r.item_id,
                 i.name AS item_name, r.quantity, r.amount_cents, r.currency, r.status, r.policy_version, r.created_at
          FROM refunds r
-         JOIN customers c ON c.id = r.customer_id
+         JOIN customers c ON c.id = r.customer_id AND c.tenant_id = r.tenant_id
          JOIN order_items i ON i.id = r.item_id
+         WHERE r.tenant_id = ?
          ORDER BY r.created_at DESC
          LIMIT ?`,
       )
-      .all(safeLimit) as RefundRow[];
+      .all(this.tenantId, safeLimit) as RefundRow[];
 
     return rows.map((row) => ({
       id: row.id,
@@ -120,11 +129,12 @@ export class AdminReadRepository {
                 (SELECT e.status FROM agent_events e WHERE e.run_id = ar.id AND e.type = 'DECISION' ORDER BY e.sequence DESC LIMIT 1) AS decision_status,
                 (SELECT e.metadata_json FROM agent_events e WHERE e.run_id = ar.id AND e.type = 'DECISION' ORDER BY e.sequence DESC LIMIT 1) AS decision_metadata_json
          FROM agent_runs ar
-         LEFT JOIN customers c ON c.id = ar.customer_id
+         LEFT JOIN customers c ON c.id = ar.customer_id AND c.tenant_id = ar.tenant_id
+         WHERE ar.tenant_id = ?
          ORDER BY ar.started_at DESC
          LIMIT ?`,
       )
-      .all(safeLimit) as RunSummaryRow[];
+      .all(this.tenantId, safeLimit) as RunSummaryRow[];
 
     return rows.map((row) => {
       const decision = parseDecision(row.decision_metadata_json);
