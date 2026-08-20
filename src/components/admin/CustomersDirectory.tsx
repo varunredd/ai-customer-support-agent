@@ -66,62 +66,61 @@ export function CustomersDirectory({ customers }: { customers: Customer[] }) {
         </div>
 
         <div className="panel">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>Email</th>
-                <th>Account</th>
-                <th>Risk</th>
-                <th>Orders</th>
-                <th>Refunds</th>
-                <th>Joined</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length ? (
-                filtered.map((customer) => (
-                  <tr key={customer.id}>
-                    <td>
-                      <div className="person-cell">
-                        <span className="avatar" style={{ background: avatarColor(customer.id) }}>
-                          {getInitials(customer.name)}
-                        </span>
-                        <div>
-                          <div className="text-strong">{customer.name}</div>
-                          <div className="muted mono" style={{ fontSize: "0.8rem" }}>{customer.id}</div>
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Email</th>
+                  <th>Account</th>
+                  <th>Risk</th>
+                  <th>Orders</th>
+                  <th>Refunds</th>
+                  <th>Joined</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length ? (
+                  filtered.map((customer) => (
+                    <tr key={customer.id}>
+                      <td>
+                        <div className="person-cell">
+                          <span className="avatar" style={{ background: avatarColor(customer.id) }}>
+                            {getInitials(customer.name)}
+                          </span>
+                          <div className="text-strong" title={customer.id}>{customer.name}</div>
                         </div>
-                      </div>
-                    </td>
-                    <td>{customer.email}</td>
-                    <td>
-                      <StatusBadge status={customer.accountStatus === "ACTIVE" ? "SUCCESS" : "FAILED"}>
-                        {customer.accountStatus}
-                      </StatusBadge>
-                    </td>
-                    <td>
-                      <StatusBadge status={customer.riskLevel}>{customer.riskLevel}</StatusBadge>
-                    </td>
-                    <td className="text-strong">{customer.lifetimeOrders}</td>
-                    <td>{customer.lifetimeRefunds}</td>
-                    <td>{formatDate(customer.createdAt)}</td>
-                    <td style={{ textAlign: "right" }}>
-                      <Link href={`/admin/customers/${customer.id}`} className="table-link">
-                        View
-                      </Link>
+                      </td>
+                      <td>{customer.email}</td>
+                      <td>
+                        <StatusBadge status={customer.accountStatus === "ACTIVE" ? "SUCCESS" : "FAILED"}>
+                          {customer.accountStatus}
+                        </StatusBadge>
+                      </td>
+                      <td>
+                        <StatusBadge status={customer.riskLevel}>{customer.riskLevel}</StatusBadge>
+                      </td>
+                      <td className="text-strong">{customer.lifetimeOrders}</td>
+                      <td>{customer.lifetimeRefunds}</td>
+                      <td>{formatDate(customer.createdAt)}</td>
+                      <td className="actions">
+                        <Link href={`/admin/customers/${customer.id}`} className="table-link">
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: "center", padding: "40px 16px" }}>
+                      No customers match the current filters.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "40px 16px" }}>
-                    No customers match the current filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

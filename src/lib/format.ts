@@ -50,3 +50,10 @@ const STAFF_ROLE_LABELS: Record<string, string> = {
 export function formatStaffRole(role: string): string {
   return STAFF_ROLE_LABELS[role] ?? role.replaceAll("_", " ").toLowerCase();
 }
+
+/** Truncate long ids for admin tables while keeping a readable prefix. */
+export function shortId(id: string, head = 10): string {
+  const value = id.trim();
+  if (value.length <= head + 1) return value;
+  return `${value.slice(0, head)}…`;
+}

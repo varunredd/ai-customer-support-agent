@@ -210,7 +210,17 @@
   font-size: 0.82rem;
   color: var(--muted);
   min-width: 140px;
-  flex: 1;
+  flex: 0 1 auto;
+}
+
+.fieldLabel:first-child {
+  flex: 0 1 220px;
+  max-width: 280px;
+}
+
+.fieldLabel:nth-child(2) {
+  flex: 0 0 140px;
+  max-width: 140px;
 }
 
 .input,

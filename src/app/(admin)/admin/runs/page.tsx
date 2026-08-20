@@ -11,7 +11,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { PersistedAgentEvent, PersistedAgentRun } from "@/domain/agent/types";
 import { toAgentEventView } from "@/lib/agent-event-view";
-import { formatMoney, formatTime } from "@/lib/format";
+import { formatMoney, formatTime, shortId } from "@/lib/format";
 import styles from "./page.module.css";
 
 interface RunSummary {
@@ -226,12 +226,12 @@ function AgentRunsPageInner() {
                   onClick={() => selectRun(run.id)}
                 >
                   <div className={styles.runHeader}>
-                    <span className={styles.runId}>{run.id}</span>
+                    <span className={styles.customer}>{run.customerName ?? run.customerId ?? "Unresolved customer"}</span>
                     <StatusBadge status={badgeStatus(run.status)}>{run.status}</StatusBadge>
                   </div>
-                  <span className={styles.customer}>{run.customerName ?? run.customerId ?? "Unresolved customer"}</span>
+                  <span className={styles.runId} title={run.id}>{shortId(run.id)}</span>
                   <div className={styles.runDetails}>
-                    <span>{run.orderId ?? "No order yet"}</span>
+                    <span title={run.orderId ?? undefined}>{run.orderId ? shortId(run.orderId) : "No order yet"}</span>
                     <span>{formatTime(run.startedAt)}</span>
                   </div>
                   {run.decision ? (
@@ -254,10 +254,10 @@ function AgentRunsPageInner() {
                 <div className={styles.detailHeader}>
                   <div>
                     <p className={styles.detailKicker}>Timeline</p>
-                    <h3 className={styles.detailTitle}>{selectedRun.id}</h3>
+                    <h3 className={styles.detailTitle} title={selectedRun.id}>{shortId(selectedRun.id, 14)}</h3>
                     <div className={styles.metaRow}>
                       <span>{selectedSummary?.customerName ?? selectedRun.customerId ?? "Customer pending"}</span>
-                      <span>{selectedRun.orderId ?? "Order pending"}</span>
+                      <span title={selectedRun.orderId ?? undefined}>{selectedRun.orderId ? shortId(selectedRun.orderId) : "Order pending"}</span>
                       <span>{eventViews.length} events</span>
                     </div>
                     {selectedSummary?.decision ? (

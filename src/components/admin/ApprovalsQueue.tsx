@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { MonoId } from "@/components/ui/MonoId";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatMoney, formatTime } from "@/lib/format";
 
@@ -98,20 +99,20 @@ export function ApprovalsQueue() {
                 ) : approvals.length ? approvals.map((item) => (
                   <tr key={item.id}>
                     <td>{formatTime(item.createdAt)}</td>
-                    <td className="mono">{item.customerId}</td>
-                    <td className="mono">{item.orderId}</td>
-                    <td className="text-strong">{formatMoney(item.amountCents)}</td>
+                    <td><MonoId id={item.customerId} /></td>
+                    <td><MonoId id={item.orderId} /></td>
+                    <td className="numeric text-strong">{formatMoney(item.amountCents)}</td>
                     <td><code>{item.reason}</code></td>
                     <td><StatusBadge status="WARNING">{item.status}</StatusBadge></td>
-                    <td>
+                    <td className="actions">
                       {item.runId ? (
                         <Link className="table-link" href={`/admin/runs?run=${encodeURIComponent(item.runId)}`}>Inspect</Link>
                       ) : "—"}
                     </td>
-                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <td className="actions">
                       <button
                         type="button"
-                        className="filter-chip filter-chip-active"
+                        className="btn btn-primary"
                         disabled={busyId === item.id}
                         onClick={() => void decide(item.id, "APPROVE")}
                       >
@@ -119,7 +120,7 @@ export function ApprovalsQueue() {
                       </button>{" "}
                       <button
                         type="button"
-                        className="filter-chip"
+                        className="btn btn-ghost"
                         disabled={busyId === item.id}
                         onClick={() => void decide(item.id, "REJECT")}
                       >

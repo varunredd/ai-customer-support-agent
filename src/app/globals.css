@@ -130,10 +130,18 @@ a {
 
 .panel {
   overflow: hidden;
+  min-width: 0;
 }
 
 .panel-body {
   padding: 20px 22px;
+}
+
+.panel-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(160px, 0.8fr) auto;
+  gap: 12px;
+  align-items: end;
 }
 
 .panel-header {
@@ -165,9 +173,15 @@ a {
 
 .content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr);
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
   gap: 16px;
   align-items: start;
+  width: 100%;
+}
+
+.content-grid > .panel {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .toolbar {
@@ -175,6 +189,106 @@ a {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field-label {
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field-input,
+.field-select {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-solid);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+.field-input:focus,
+.field-select:focus {
+  border-color: rgba(91, 87, 214, 0.45);
+  box-shadow: 0 0 0 4px rgba(91, 87, 214, 0.12);
+}
+
+.field-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 34px;
+}
+
+.field-input-sm {
+  max-width: 140px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: var(--panel);
+  border-color: var(--border);
+  color: var(--muted-strong);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-subtle);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--accent-text);
+  height: auto;
+  padding: 6px 8px;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  text-decoration: underline;
 }
 
 .search-field {
@@ -297,8 +411,10 @@ code, pre, .mono {
 
 .table-container {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   background: transparent;
+  -webkit-overflow-scrolling: touch;
 }
 
 .panel .table-container,
@@ -311,6 +427,7 @@ code, pre, .mono {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  table-layout: auto;
 }
 
 .table th {
@@ -331,6 +448,21 @@ code, pre, .mono {
   color: var(--muted-strong);
   vertical-align: middle;
   font-size: 0.95rem;
+}
+
+.table td.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table th.numeric {
+  text-align: right;
+}
+
+.table td.actions {
+  text-align: right;
+  white-space: nowrap;
 }
 
 .table tbody tr:last-child td {
@@ -447,6 +579,10 @@ code, pre, .mono {
 @media (max-width: 1100px) {
   .kpi-grid,
   .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-form {
     grid-template-columns: 1fr;
   }
 }

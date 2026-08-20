@@ -4,8 +4,9 @@ import { getDatabase } from "@/db/database";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { MonoId } from "@/components/ui/MonoId";
 import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
-import { formatMoney, formatTime } from "@/lib/format";
+import { formatMoney, formatTime, shortId } from "@/lib/format";
 import { AdminReadRepository } from "@/repositories/admin-read.repository";
 import { RefundApprovalRepository } from "@/repositories/refund-approval.repository";
 import { SupportEscalationRepository } from "@/repositories/support-escalation.repository";
@@ -55,24 +56,34 @@ export default function AdminOverviewPage() {
               <h2 className="panel-title">Recent runs</h2>
               <Link href="/admin/runs" className="table-link">View all</Link>
             </div>
-            <table className="table">
-              <thead><tr><th>Run</th><th>Customer</th><th>Order</th><th>Outcome</th><th>Started</th></tr></thead>
-              <tbody>
-                {recentRuns.map((run) => (
-                  <tr key={run.id}>
-                    <td className="mono text-strong">{run.id}</td>
-                    <td className="text-strong">{run.customerName ?? run.customerId ?? "Pending"}</td>
-                    <td className="mono">{run.orderId ?? "—"}</td>
-                    <td>
-                      <StatusBadge status={run.status === "FAILED" || run.decision === "DENY" ? "FAILED" : run.status === "IN_PROGRESS" ? "RUNNING" : "SUCCESS"}>
-                        {run.status === "FAILED" ? "FAILED" : run.decision ?? run.status}
-                      </StatusBadge>
-                    </td>
-                    <td>{formatTime(run.startedAt)}</td>
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Run</th>
+                    <th>Order</th>
+                    <th>Outcome</th>
+                    <th>Started</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recentRuns.map((run) => (
+                    <tr key={run.id}>
+                      <td className="text-strong">{run.customerName ?? run.customerId ?? "Pending"}</td>
+                      <td><MonoId id={run.id} /></td>
+                      <td>{run.orderId ? <MonoId id={run.orderId} /> : "—"}</td>
+                      <td>
+                        <StatusBadge status={run.status === "FAILED" || run.decision === "DENY" ? "FAILED" : run.status === "IN_PROGRESS" ? "RUNNING" : "SUCCESS"}>
+                          {run.status === "FAILED" ? "FAILED" : run.decision ?? run.status}
+                        </StatusBadge>
+                      </td>
+                      <td>{formatTime(run.startedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {recentRuns.length === 0 ? <div className="state-container"><p className="state-description">No runs yet.</p></div> : null}
           </section>
 
@@ -86,7 +97,7 @@ export default function AdminOverviewPage() {
                 <Link key={item.id} href="/admin/approvals" className={styles.attentionItem}>
                   <div>
                     <strong>Refund approval · {formatMoney(item.amountCents)}</strong>
-                    <span>{item.orderId} · {item.reason}</span>
+                    <span title={item.orderId}>{shortId(item.orderId)} · {item.reason}</span>
                   </div>
                   <div className={styles.attentionBadges}>
                     <StatusBadge status="WARNING">PENDING</StatusBadge>

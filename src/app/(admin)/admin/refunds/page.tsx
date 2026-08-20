@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { MonoId } from "@/components/ui/MonoId";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatMoney, formatTime } from "@/lib/format";
 
@@ -76,44 +77,46 @@ export default function RefundsLedgerPage() {
         <div className="panel">
           {loading ? <LoadingState message="Loading…" /> : error ? <ErrorState description={error} /> : (
             <>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Refund</th>
-                    <th>Customer</th>
-                    <th>Order</th>
-                    <th>Item</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>Policy</th>
-                    <th>Processed</th>
-                    <th>Run</th>
-                  </tr>
-                </thead>
-                {visible.length > 0 ? (
-                  <tbody>
-                    {visible.map((refund) => (
-                      <tr key={refund.id}>
-                        <td className="mono text-strong">{refund.id}</td>
-                        <td className="text-strong">{refund.customerName}</td>
-                        <td className="mono">{refund.orderId}</td>
-                        <td>{refund.itemName} · Qty {refund.quantity}</td>
-                        <td className="text-strong">{formatMoney(refund.amountCents)}</td>
-                        <td><StatusBadge status="SUCCESS">COMPLETED</StatusBadge></td>
-                        <td className="mono">{refund.policyVersion ?? "legacy"}</td>
-                        <td>{formatTime(refund.createdAt)}</td>
-                        <td>
-                          {refund.runId ? (
-                            <Link className="table-link" href={`/admin/runs?run=${encodeURIComponent(refund.runId)}`}>Inspect</Link>
-                          ) : (
-                            <span>Seeded</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                ) : null}
-              </table>
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Customer</th>
+                      <th>Refund</th>
+                      <th>Order</th>
+                      <th>Item</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Policy</th>
+                      <th>Processed</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  {visible.length > 0 ? (
+                    <tbody>
+                      {visible.map((refund) => (
+                        <tr key={refund.id}>
+                          <td className="text-strong">{refund.customerName}</td>
+                          <td><MonoId id={refund.id} /></td>
+                          <td><MonoId id={refund.orderId} /></td>
+                          <td>{refund.itemName} · Qty {refund.quantity}</td>
+                          <td className="numeric text-strong">{formatMoney(refund.amountCents)}</td>
+                          <td><StatusBadge status="SUCCESS">COMPLETED</StatusBadge></td>
+                          <td className="mono">{refund.policyVersion ?? "legacy"}</td>
+                          <td>{formatTime(refund.createdAt)}</td>
+                          <td className="actions">
+                            {refund.runId ? (
+                              <Link className="table-link" href={`/admin/runs?run=${encodeURIComponent(refund.runId)}`}>Inspect</Link>
+                            ) : (
+                              <span className="muted">Seeded</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  ) : null}
+                </table>
+              </div>
               {visible.length === 0 ? (
                 <EmptyState
                   title={refunds.length === 0 ? "No refunds yet" : "No matches"}
