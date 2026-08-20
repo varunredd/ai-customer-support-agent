@@ -11,8 +11,12 @@ export function GET() {
     db.prepare("SELECT 1 AS ok").get();
     const migration = db.prepare("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations").get() as { version: number };
     checks.database = { ok: migration.version === SCHEMA_VERSION, detail: `schema ${migration.version}/${SCHEMA_VERSION}` };
-  } catch {
-    checks.database = { ok: false, detail: "database unavailable" };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    checks.database = {
+      ok: false,
+      detail: `database unavailable: ${message.slice(0, 240)}`,
+    };
   }
 
   const requireOpenAI = process.env.NODE_ENV === "production" || process.env.HEALTH_REQUIRE_OPENAI === "true";
