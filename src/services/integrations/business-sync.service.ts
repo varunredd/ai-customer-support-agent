@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { AppDatabase } from "@/db/database";
 import type { AccountStatus, Customer, Order, OrderItem, OrderStatus, RiskLevel } from "@/domain/refunds/types";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 export class BusinessSyncValidationError extends Error {
   readonly code = "BUSINESS_SYNC_VALIDATION_FAILED";
@@ -111,9 +112,11 @@ export function syncBusinessContext(db: AppDatabase, input: {
   eventId: string;
   rawBody: string;
   snapshot: BusinessContextSnapshot;
+  tenantId?: string;
 }) {
+  const tenantId = resolveTenantId(db, input.tenantId);
   const payloadHash = createHash("sha256").update(input.rawBody).digest("hex");
-  const existing = db.prepare("SELECT payload_hash, status FROM integration_events WHERE external_event_id = ?").get(input.eventId) as
+  const existing = db.prepare("SELECT payload_hash, status FROM integration_events WHERE tenant_id = ? AND external_event_id = ?").get(tenantId, input.eventId) as
     | { payload_hash: string; status: "PROCESSED" | "REJECTED" }
     | undefined;
   if (existing) {
@@ -124,23 +127,25 @@ export function syncBusinessContext(db: AppDatabase, input: {
   const tx = db.transaction(() => {
     const customer = input.snapshot.customer;
     db.prepare(`INSERT INTO customers (
-      id, name, email, account_status, risk_level, lifetime_orders, lifetime_refunds, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      id, tenant_id, name, email, account_status, risk_level, lifetime_orders, lifetime_refunds, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
+      tenant_id = excluded.tenant_id,
       name = excluded.name,
       email = excluded.email,
       account_status = excluded.account_status,
       risk_level = excluded.risk_level,
       lifetime_orders = MAX(customers.lifetime_orders, excluded.lifetime_orders),
       lifetime_refunds = MAX(customers.lifetime_refunds, excluded.lifetime_refunds)`)
-      .run(customer.id, customer.name, customer.email, customer.accountStatus, customer.riskLevel, customer.lifetimeOrders, customer.lifetimeRefunds, customer.createdAt);
+      .run(customer.id, tenantId, customer.name, customer.email, customer.accountStatus, customer.riskLevel, customer.lifetimeOrders, customer.lifetimeRefunds, customer.createdAt);
 
     for (const order of input.snapshot.orders) {
       db.prepare(`INSERT INTO orders (
-        id, customer_id, status, currency, subtotal_cents, shipping_cents, tax_cents,
+        id, tenant_id, customer_id, status, currency, subtotal_cents, shipping_cents, tax_cents,
         total_paid_cents, refunded_cents, placed_at, delivered_at
-      ) VALUES (?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
+        tenant_id = excluded.tenant_id,
         customer_id = excluded.customer_id,
         status = excluded.status,
         subtotal_cents = excluded.subtotal_cents,
@@ -150,7 +155,7 @@ export function syncBusinessContext(db: AppDatabase, input: {
         refunded_cents = MAX(orders.refunded_cents, excluded.refunded_cents),
         placed_at = excluded.placed_at,
         delivered_at = excluded.delivered_at`)
-        .run(order.id, order.customerId, order.status, order.subtotalCents, order.shippingCents, order.taxCents, order.totalPaidCents, order.refundedCents, order.placedAt, order.deliveredAt);
+        .run(order.id, tenantId, order.customerId, order.status, order.subtotalCents, order.shippingCents, order.taxCents, order.totalPaidCents, order.refundedCents, order.placedAt, order.deliveredAt);
 
       for (const item of order.items) {
         db.prepare(`INSERT INTO order_items (
@@ -170,9 +175,9 @@ export function syncBusinessContext(db: AppDatabase, input: {
 
     const now = new Date().toISOString();
     db.prepare(`INSERT INTO integration_events (
-      id, source, external_event_id, payload_hash, status, error_code, created_at, processed_at
-    ) VALUES (?, ?, ?, ?, 'PROCESSED', NULL, ?, ?)`)
-      .run(`int_${randomUUID()}`, input.source, input.eventId, payloadHash, now, now);
+      id, tenant_id, source, external_event_id, payload_hash, status, error_code, created_at, processed_at
+    ) VALUES (?, ?, ?, ?, ?, 'PROCESSED', NULL, ?, ?)`)
+      .run(`int_${randomUUID()}`, tenantId, input.source, input.eventId, payloadHash, now, now);
   });
 
   tx.immediate();

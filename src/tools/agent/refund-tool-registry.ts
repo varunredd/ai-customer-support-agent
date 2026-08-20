@@ -6,6 +6,7 @@ import { SupportEscalationRepository } from "@/repositories/support-escalation.r
 import { createSqliteCustomerRepository, createSqliteOrderRepository } from "@/repositories/sqlite";
 import { evaluateRefundEligibility } from "@/services/refund-eligibility.service";
 import { executeRefundAtomically } from "@/services/refund-execution.service";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 import type { AgentTool } from "@/tools/agent/types";
 import {
   AgentToolError,
@@ -223,8 +224,8 @@ export function createRefundToolRegistry(db: AppDatabase, options: CreateRefundT
         }
 
         const refunded = db
-          .prepare("SELECT COALESCE(SUM(quantity), 0) AS quantity FROM refunds WHERE item_id = ?")
-          .get(request.itemId) as { quantity: number };
+          .prepare("SELECT COALESCE(SUM(quantity), 0) AS quantity FROM refunds WHERE tenant_id = ? AND item_id = ?")
+          .get(resolveTenantId(db), request.itemId) as { quantity: number };
         const policy = policyRepository.getActive();
         const evaluation = evaluateRefundEligibility(customer, order, request, {
           alreadyRefundedItemQuantity: refunded.quantity,

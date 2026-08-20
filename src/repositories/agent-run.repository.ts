@@ -8,6 +8,7 @@ import type {
   PersistedAgentEvent,
   PersistedAgentRun,
 } from "@/domain/agent/types";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 interface AgentRunRow {
   id: string;
@@ -78,17 +79,24 @@ function mapRun(row: AgentRunRow): PersistedAgentRun {
 }
 
 export class AgentRunRepository {
-  constructor(private readonly db: AppDatabase) {}
+  private readonly tenantId: string;
+
+  constructor(
+    private readonly db: AppDatabase,
+    tenantId?: string,
+  ) {
+    this.tenantId = resolveTenantId(db, tenantId);
+  }
 
   create(input: { id?: string; model: string; inputText: string; startedAt?: string }) {
     const id = input.id ?? `run_${randomUUID()}`;
     const startedAt = input.startedAt ?? new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO agent_runs (id, status, model, input_text, started_at)
-         VALUES (?, 'IN_PROGRESS', ?, ?, ?)`,
+        `INSERT INTO agent_runs (id, tenant_id, status, model, input_text, started_at)
+         VALUES (?, ?, 'IN_PROGRESS', ?, ?, ?)`,
       )
-      .run(id, input.model, input.inputText, startedAt);
+      .run(id, this.tenantId, input.model, input.inputText, startedAt);
     return id;
   }
 
@@ -136,13 +144,13 @@ export class AgentRunRepository {
   }
 
   setContext(runId: string, input: { customerId?: string; orderId?: string }) {
-    const current = this.db.prepare("SELECT customer_id, order_id FROM agent_runs WHERE id = ?").get(runId) as
+    const current = this.db.prepare("SELECT customer_id, order_id FROM agent_runs WHERE tenant_id = ? AND id = ?").get(this.tenantId, runId) as
       | { customer_id: string | null; order_id: string | null }
       | undefined;
     if (!current) return;
     this.db
-      .prepare("UPDATE agent_runs SET customer_id = ?, order_id = ? WHERE id = ?")
-      .run(input.customerId ?? current.customer_id, input.orderId ?? current.order_id, runId);
+      .prepare("UPDATE agent_runs SET customer_id = ?, order_id = ? WHERE tenant_id = ? AND id = ?")
+      .run(input.customerId ?? current.customer_id, input.orderId ?? current.order_id, this.tenantId, runId);
   }
 
   complete(runId: string, finalOutput: string) {
@@ -150,9 +158,9 @@ export class AgentRunRepository {
       .prepare(
         `UPDATE agent_runs
          SET status = 'COMPLETED', final_output = ?, completed_at = ?, error_code = NULL, error_message = NULL
-         WHERE id = ?`,
+         WHERE tenant_id = ? AND id = ?`,
       )
-      .run(finalOutput, new Date().toISOString(), runId);
+      .run(finalOutput, new Date().toISOString(), this.tenantId, runId);
   }
 
   fail(runId: string, code: string, message: string) {
@@ -160,13 +168,13 @@ export class AgentRunRepository {
       .prepare(
         `UPDATE agent_runs
          SET status = 'FAILED', error_code = ?, error_message = ?, completed_at = ?
-         WHERE id = ?`,
+         WHERE tenant_id = ? AND id = ?`,
       )
-      .run(code, message, new Date().toISOString(), runId);
+      .run(code, message, new Date().toISOString(), this.tenantId, runId);
   }
 
   findById(runId: string, includeEvents = true): PersistedAgentRun | null {
-    const row = this.db.prepare("SELECT * FROM agent_runs WHERE id = ?").get(runId) as AgentRunRow | undefined;
+    const row = this.db.prepare("SELECT * FROM agent_runs WHERE tenant_id = ? AND id = ?").get(this.tenantId, runId) as AgentRunRow | undefined;
     if (!row) return null;
     const run = mapRun(row);
     if (includeEvents) {
@@ -190,8 +198,8 @@ export class AgentRunRepository {
   listRecent(limit = 50): PersistedAgentRun[] {
     const safeLimit = Math.max(1, Math.min(200, Math.trunc(limit)));
     const rows = this.db
-      .prepare("SELECT * FROM agent_runs ORDER BY started_at DESC LIMIT ?")
-      .all(safeLimit) as AgentRunRow[];
+      .prepare("SELECT * FROM agent_runs WHERE tenant_id = ? ORDER BY started_at DESC LIMIT ?")
+      .all(this.tenantId, safeLimit) as AgentRunRow[];
     return rows.map(mapRun);
   }
 }

@@ -5,6 +5,7 @@ import type { Customer, Order, OrderItem, RefundEvaluation, RefundRequest } from
 import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 import { NotificationOutboxRepository } from "@/repositories/notification-outbox.repository";
 import { evaluateRefundEligibility } from "@/services/refund-eligibility.service";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 interface ExistingRefundRow {
   id: string;
@@ -161,17 +162,18 @@ export class IdempotencyConflictError extends Error {
   }
 }
 
-export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInput): ExecuteRefundResult {
+export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInput, tenantId?: string): ExecuteRefundResult {
   if (!input.idempotencyKey.trim()) {
     throw new Error("Idempotency key is required for refund execution.");
   }
 
+  const tenant = resolveTenantId(db, tenantId);
   const requestFingerprint = fingerprint(input.request);
 
   const executeTransaction = db.transaction((): ExecuteRefundResult => {
     const existing = db
-      .prepare("SELECT * FROM refunds WHERE idempotency_key = ?")
-      .get(input.idempotencyKey) as ExistingRefundRow | undefined;
+      .prepare("SELECT * FROM refunds WHERE tenant_id = ? AND idempotency_key = ?")
+      .get(tenant, input.idempotencyKey) as ExistingRefundRow | undefined;
 
     if (existing) {
       if (existing.request_fingerprint !== requestFingerprint) {
@@ -188,10 +190,10 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
       };
     }
 
-    const customerRow = db.prepare("SELECT * FROM customers WHERE id = ?").get(input.request.customerId) as
+    const customerRow = db.prepare("SELECT * FROM customers WHERE tenant_id = ? AND id = ?").get(tenant, input.request.customerId) as
       | CustomerRow
       | undefined;
-    const orderRow = db.prepare("SELECT * FROM orders WHERE id = ?").get(input.request.orderId) as
+    const orderRow = db.prepare("SELECT * FROM orders WHERE tenant_id = ? AND id = ?").get(tenant, input.request.orderId) as
       | OrderRow
       | undefined;
 
@@ -225,18 +227,18 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
             items: [],
           };
       const evaluation = evaluateRefundEligibility(fallbackCustomer, fallbackOrder, input.request, {
-        policy: new RefundPolicyRepository(db).getActive(),
+        policy: new RefundPolicyRepository(db, tenant).getActive(),
       });
       return { status: "DENIED", idempotentReplay: false, refund: null, evaluation };
     }
 
     const alreadyRefunded = db
-      .prepare("SELECT COALESCE(SUM(quantity), 0) AS quantity FROM refunds WHERE item_id = ?")
-      .get(input.request.itemId) as { quantity: number };
+      .prepare("SELECT COALESCE(SUM(quantity), 0) AS quantity FROM refunds WHERE tenant_id = ? AND item_id = ?")
+      .get(tenant, input.request.itemId) as { quantity: number };
 
     const customer = mapCustomer(customerRow);
     const order = loadOrder(db, orderRow);
-    const policy = new RefundPolicyRepository(db).getActive();
+    const policy = new RefundPolicyRepository(db, tenant).getActive();
     const evaluation = evaluateRefundEligibility(customer, order, input.request, {
       alreadyRefundedItemQuantity: alreadyRefunded.quantity,
       policy,
@@ -250,11 +252,12 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
     const refundId = `ref_${randomUUID()}`;
     db.prepare(`
       INSERT INTO refunds (
-        id, idempotency_key, request_fingerprint, run_id, customer_id, order_id, item_id,
+        id, tenant_id, idempotency_key, request_fingerprint, run_id, customer_id, order_id, item_id,
         quantity, reason, condition, amount_cents, currency, status, policy_version, evaluation_json, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'USD', 'COMPLETED', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'USD', 'COMPLETED', ?, ?, ?)
     `).run(
       refundId,
+      tenant,
       input.idempotencyKey,
       requestFingerprint,
       input.runId ?? null,
@@ -270,15 +273,17 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
       now,
     );
 
-    db.prepare("UPDATE orders SET refunded_cents = refunded_cents + ? WHERE id = ?").run(
+    db.prepare("UPDATE orders SET refunded_cents = refunded_cents + ? WHERE tenant_id = ? AND id = ?").run(
       evaluation.refundAmountCents,
+      tenant,
       input.request.orderId,
     );
-    db.prepare("UPDATE customers SET lifetime_refunds = lifetime_refunds + 1 WHERE id = ?").run(
+    db.prepare("UPDATE customers SET lifetime_refunds = lifetime_refunds + 1 WHERE tenant_id = ? AND id = ?").run(
+      tenant,
       input.request.customerId,
     );
 
-    new NotificationOutboxRepository(db).enqueue({
+    new NotificationOutboxRepository(db, tenant).enqueue({
       eventKey: `refund-completed:${refundId}`,
       eventType: "REFUND_COMPLETED",
       recipient: customer.email,
@@ -292,7 +297,7 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
       },
     });
 
-    const row = db.prepare("SELECT * FROM refunds WHERE id = ?").get(refundId) as ExistingRefundRow;
+    const row = db.prepare("SELECT * FROM refunds WHERE tenant_id = ? AND id = ?").get(tenant, refundId) as ExistingRefundRow;
     return {
       status: "COMPLETED",
       idempotentReplay: false,

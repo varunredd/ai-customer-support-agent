@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AppDatabase } from "@/db/database";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 export type NotificationStatus = "PENDING" | "SENT" | "DEAD";
 
@@ -58,7 +59,14 @@ function map(row: Row): NotificationRecord {
 }
 
 export class NotificationOutboxRepository {
-  constructor(private readonly db: AppDatabase) {}
+  private readonly tenantId: string;
+
+  constructor(
+    private readonly db: AppDatabase,
+    tenantId?: string,
+  ) {
+    this.tenantId = resolveTenantId(db, tenantId);
+  }
 
   enqueue(input: {
     eventKey: string;
@@ -70,34 +78,34 @@ export class NotificationOutboxRepository {
     const now = new Date().toISOString();
     const id = `ntf_${randomUUID()}`;
     this.db.prepare(`INSERT OR IGNORE INTO notification_outbox (
-      id, event_key, event_type, recipient, subject, payload_json, status,
+      id, tenant_id, event_key, event_type, recipient, subject, payload_json, status,
       attempts, next_attempt_at, provider_message_id, last_error, created_at, updated_at, sent_at
-    ) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, NULL, NULL, ?, ?, NULL)`)
-      .run(id, input.eventKey, input.eventType, input.recipient, input.subject, JSON.stringify(input.payload), now, now, now);
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, NULL, NULL, ?, ?, NULL)`)
+      .run(id, this.tenantId, input.eventKey, input.eventType, input.recipient, input.subject, JSON.stringify(input.payload), now, now, now);
     return this.findByEventKey(input.eventKey);
   }
 
   findByEventKey(eventKey: string): NotificationRecord | null {
-    const row = this.db.prepare("SELECT * FROM notification_outbox WHERE event_key = ?").get(eventKey) as Row | undefined;
+    const row = this.db.prepare("SELECT * FROM notification_outbox WHERE tenant_id = ? AND event_key = ?").get(this.tenantId, eventKey) as Row | undefined;
     return row ? map(row) : null;
   }
 
   listDispatchable(now = new Date().toISOString(), limit = 25): NotificationRecord[] {
     const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
     return (this.db.prepare(`SELECT * FROM notification_outbox
-      WHERE status = 'PENDING' AND next_attempt_at <= ?
-      ORDER BY created_at ASC LIMIT ?`).all(now, safeLimit) as Row[]).map(map);
+      WHERE tenant_id = ? AND status = 'PENDING' AND next_attempt_at <= ?
+      ORDER BY created_at ASC LIMIT ?`).all(this.tenantId, now, safeLimit) as Row[]).map(map);
   }
 
   markSent(id: string, providerMessageId: string) {
     const now = new Date().toISOString();
     this.db.prepare(`UPDATE notification_outbox SET
       status = 'SENT', provider_message_id = ?, last_error = NULL,
-      updated_at = ?, sent_at = ? WHERE id = ?`).run(providerMessageId, now, now, id);
+      updated_at = ?, sent_at = ? WHERE id = ? AND tenant_id = ?`).run(providerMessageId, now, now, id, this.tenantId);
   }
 
   markFailed(id: string, errorMessage: string, maxAttempts = 5) {
-    const row = this.db.prepare("SELECT attempts FROM notification_outbox WHERE id = ?").get(id) as { attempts: number } | undefined;
+    const row = this.db.prepare("SELECT attempts FROM notification_outbox WHERE id = ? AND tenant_id = ?").get(id, this.tenantId) as { attempts: number } | undefined;
     if (!row) return;
     const attempts = row.attempts + 1;
     const dead = attempts >= maxAttempts;
@@ -106,11 +114,11 @@ export class NotificationOutboxRepository {
     const now = new Date().toISOString();
     this.db.prepare(`UPDATE notification_outbox SET
       status = ?, attempts = ?, next_attempt_at = ?, last_error = ?, updated_at = ?
-      WHERE id = ?`).run(dead ? "DEAD" : "PENDING", attempts, nextAttemptAt, errorMessage.slice(0, 1000), now, id);
+      WHERE id = ? AND tenant_id = ?`).run(dead ? "DEAD" : "PENDING", attempts, nextAttemptAt, errorMessage.slice(0, 1000), now, id, this.tenantId);
   }
 
   listRecent(limit = 50): NotificationRecord[] {
     const safeLimit = Math.max(1, Math.min(200, Math.trunc(limit)));
-    return (this.db.prepare("SELECT * FROM notification_outbox ORDER BY created_at DESC LIMIT ?").all(safeLimit) as Row[]).map(map);
+    return (this.db.prepare("SELECT * FROM notification_outbox WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?").all(this.tenantId, safeLimit) as Row[]).map(map);
   }
 }

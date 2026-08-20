@@ -5,6 +5,7 @@ import { MIGRATIONS, MIGRATION_TABLE_SQL } from "@/db/schema";
 import { purgeLegacySampleCatalog } from "@/db/clear-business-data";
 import { seedCatalog } from "@/db/seed";
 import { ensureEcommerceSyncSchedulerStarted } from "@/services/integrations/ecommerce-sync-scheduler";
+import { ensureDefaultTenant, resetTenantContextCache } from "@/services/tenant/tenant-context.service";
 
 export type AppDatabase = Database.Database;
 
@@ -20,6 +21,7 @@ export function createDatabase(filename: string): AppDatabase {
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 5000");
   migrateDatabase(db);
+  ensureDefaultTenant(db);
   return db;
 }
 
@@ -55,10 +57,11 @@ export function getDatabase(): AppDatabase {
     singleton = createDatabase(filename);
     purgeLegacySampleCatalog(singleton);
     ensureEcommerceSyncSchedulerStarted();
-    const customerCount = (singleton.prepare("SELECT COUNT(*) AS count FROM customers").get() as { count: number }).count;
+    const tenantId = ensureDefaultTenant(singleton);
+    const customerCount = (singleton.prepare("SELECT COUNT(*) AS count FROM customers WHERE tenant_id = ?").get(tenantId) as { count: number }).count;
     if (customerCount === 0) {
       const allowSeed = process.env.SEED_SAMPLE_CATALOG?.trim().toLowerCase() === "true";
-      if (allowSeed) seedCatalog(singleton);
+      if (allowSeed) seedCatalog(singleton, tenantId);
     }
   }
   return singleton;
@@ -67,4 +70,5 @@ export function getDatabase(): AppDatabase {
 export function closeDatabaseForTests() {
   singleton?.close();
   singleton = null;
+  resetTenantContextCache();
 }

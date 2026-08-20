@@ -8,6 +8,7 @@ import {
   type RefundPolicyRuleCode,
 } from "@/domain/refunds/policy";
 import { POLICY_RULE_CODES } from "@/domain/refunds/policy-catalog";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 export type RefundPolicyStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 
@@ -99,12 +100,19 @@ function mapPolicy(row: PolicyRow): PersistedRefundPolicy {
 }
 
 export class RefundPolicyRepository {
-  constructor(private readonly db: AppDatabase) {}
+  private readonly tenantId: string;
+
+  constructor(
+    private readonly db: AppDatabase,
+    tenantId?: string,
+  ) {
+    this.tenantId = resolveTenantId(db, tenantId);
+  }
 
   getActiveOrNull(): PersistedRefundPolicy | null {
     const row = this.db
-      .prepare("SELECT * FROM refund_policy_versions WHERE status = 'ACTIVE' LIMIT 1")
-      .get() as PolicyRow | undefined;
+      .prepare("SELECT * FROM refund_policy_versions WHERE tenant_id = ? AND status = 'ACTIVE' LIMIT 1")
+      .get(this.tenantId) as PolicyRow | undefined;
     return row ? mapPolicy(row) : null;
   }
 
@@ -117,8 +125,9 @@ export class RefundPolicyRepository {
   list(): PersistedRefundPolicy[] {
     return (this.db
       .prepare(`SELECT * FROM refund_policy_versions
+        WHERE tenant_id = ?
         ORDER BY CASE status WHEN 'ACTIVE' THEN 0 WHEN 'DRAFT' THEN 1 ELSE 2 END, created_at DESC`)
-      .all() as PolicyRow[]).map(mapPolicy);
+      .all(this.tenantId) as PolicyRow[]).map(mapPolicy);
   }
 
   createActive(input: {
@@ -141,12 +150,12 @@ export class RefundPolicyRepository {
       : normalizeRules(cloneRules(catalogRuleTemplates()));
     const id = `pol_${randomUUID()}`;
     const now = new Date().toISOString();
-    this.db.prepare("DELETE FROM refund_policy_versions WHERE status = 'DRAFT'").run();
+    this.db.prepare("DELETE FROM refund_policy_versions WHERE tenant_id = ? AND status = 'DRAFT'").run(this.tenantId);
     this.db
       .prepare(`INSERT INTO refund_policy_versions (
-        id, version, status, refund_window_days, rules_json, created_at, published_at
-      ) VALUES (?, ?, 'ACTIVE', ?, ?, ?, ?)`)
-      .run(id, version, input.refundWindowDays, JSON.stringify(rules), now, now);
+        id, tenant_id, version, status, refund_window_days, rules_json, created_at, published_at
+      ) VALUES (?, ?, ?, 'ACTIVE', ?, ?, ?, ?)`)
+      .run(id, this.tenantId, version, input.refundWindowDays, JSON.stringify(rules), now, now);
     return this.findById(id)!;
   }
 
@@ -154,8 +163,8 @@ export class RefundPolicyRepository {
   activatePendingDraft(): PersistedRefundPolicy | null {
     if (this.getActiveOrNull()) return null;
     const draft = this.db
-      .prepare("SELECT * FROM refund_policy_versions WHERE status = 'DRAFT' ORDER BY created_at DESC LIMIT 1")
-      .get() as PolicyRow | undefined;
+      .prepare("SELECT * FROM refund_policy_versions WHERE tenant_id = ? AND status = 'DRAFT' ORDER BY created_at DESC LIMIT 1")
+      .get(this.tenantId) as PolicyRow | undefined;
     if (!draft) return null;
     return this.publish(draft.id);
   }
@@ -187,9 +196,9 @@ export class RefundPolicyRepository {
     const now = new Date().toISOString();
     this.db
       .prepare(`INSERT INTO refund_policy_versions (
-        id, version, status, refund_window_days, rules_json, created_at, published_at
-      ) VALUES (?, ?, 'DRAFT', ?, ?, ?, NULL)`)
-      .run(id, version, input.refundWindowDays, JSON.stringify(normalized), now);
+        id, tenant_id, version, status, refund_window_days, rules_json, created_at, published_at
+      ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, NULL)`)
+      .run(id, this.tenantId, version, input.refundWindowDays, JSON.stringify(normalized), now);
     return this.findById(id)!;
   }
 
@@ -238,8 +247,8 @@ export class RefundPolicyRepository {
     this.db
       .prepare(`UPDATE refund_policy_versions
         SET version = ?, refund_window_days = ?, rules_json = ?
-        WHERE id = ? AND status = ?`)
-      .run(version, refundWindowDays, JSON.stringify(rules), id, status);
+        WHERE id = ? AND tenant_id = ? AND status = ?`)
+      .run(version, refundWindowDays, JSON.stringify(rules), id, this.tenantId, status);
     return this.findById(id)!;
   }
 
@@ -249,7 +258,7 @@ export class RefundPolicyRepository {
     if (current.status === "ACTIVE") {
       throw new Error("The active policy cannot be deleted. Publish a replacement first.");
     }
-    this.db.prepare("DELETE FROM refund_policy_versions WHERE id = ?").run(id);
+    this.db.prepare("DELETE FROM refund_policy_versions WHERE id = ? AND tenant_id = ?").run(id, this.tenantId);
   }
 
   publish(id: string): PersistedRefundPolicy {
@@ -257,15 +266,15 @@ export class RefundPolicyRepository {
     if (!target) throw new Error("Refund policy was not found.");
     const now = new Date().toISOString();
     const tx = this.db.transaction(() => {
-      this.db.prepare("UPDATE refund_policy_versions SET status = 'ARCHIVED' WHERE status = 'ACTIVE' AND id <> ?").run(id);
-      this.db.prepare("UPDATE refund_policy_versions SET status = 'ACTIVE', published_at = ? WHERE id = ?").run(now, id);
+      this.db.prepare("UPDATE refund_policy_versions SET status = 'ARCHIVED' WHERE tenant_id = ? AND status = 'ACTIVE' AND id <> ?").run(this.tenantId, id);
+      this.db.prepare("UPDATE refund_policy_versions SET status = 'ACTIVE', published_at = ? WHERE id = ? AND tenant_id = ?").run(now, id, this.tenantId);
     });
     tx.immediate();
     return this.findById(id)!;
   }
 
   findById(id: string): PersistedRefundPolicy | null {
-    const row = this.db.prepare("SELECT * FROM refund_policy_versions WHERE id = ?").get(id) as PolicyRow | undefined;
+    const row = this.db.prepare("SELECT * FROM refund_policy_versions WHERE tenant_id = ? AND id = ?").get(this.tenantId, id) as PolicyRow | undefined;
     return row ? mapPolicy(row) : null;
   }
 }

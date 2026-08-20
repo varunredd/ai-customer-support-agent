@@ -1,13 +1,16 @@
 import type { AppDatabase } from "@/db/database";
 import { customers } from "@/data/customers";
 import { orders } from "@/data/orders";
+import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
-export function seedCatalog(db: AppDatabase) {
+export function seedCatalog(db: AppDatabase, tenantId?: string) {
+  const tenant = resolveTenantId(db, tenantId);
   const insertCustomer = db.prepare(`
     INSERT INTO customers (
-      id, name, email, account_status, risk_level, lifetime_orders, lifetime_refunds, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      id, tenant_id, name, email, account_status, risk_level, lifetime_orders, lifetime_refunds, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
+      tenant_id = excluded.tenant_id,
       name = excluded.name,
       email = excluded.email,
       account_status = excluded.account_status,
@@ -18,10 +21,11 @@ export function seedCatalog(db: AppDatabase) {
 
   const insertOrder = db.prepare(`
     INSERT INTO orders (
-      id, customer_id, status, currency, subtotal_cents, shipping_cents, tax_cents,
+      id, tenant_id, customer_id, status, currency, subtotal_cents, shipping_cents, tax_cents,
       total_paid_cents, refunded_cents, placed_at, delivered_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
+      tenant_id = excluded.tenant_id,
       customer_id = excluded.customer_id,
       status = excluded.status,
       currency = excluded.currency,
@@ -51,6 +55,7 @@ export function seedCatalog(db: AppDatabase) {
     for (const customer of customers) {
       insertCustomer.run(
         customer.id,
+        tenant,
         customer.name,
         customer.email,
         customer.accountStatus,
@@ -64,6 +69,7 @@ export function seedCatalog(db: AppDatabase) {
     for (const order of orders) {
       insertOrder.run(
         order.id,
+        tenant,
         order.customerId,
         order.status,
         order.currency,
@@ -93,11 +99,12 @@ export function seedCatalog(db: AppDatabase) {
     // Seed the matching item-level ledger row so remaining quantity is enforced.
     db.prepare(`
       INSERT OR IGNORE INTO refunds (
-        id, idempotency_key, request_fingerprint, run_id, customer_id, order_id, item_id,
+        id, tenant_id, idempotency_key, request_fingerprint, run_id, customer_id, order_id, item_id,
         quantity, reason, condition, amount_cents, currency, status, evaluation_json, created_at
-      ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 'USD', 'COMPLETED', ?, ?)
+      ) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 'USD', 'COMPLETED', ?, ?)
     `).run(
       "ref_seed_partial",
+      tenant,
       "seed:ord_8906:item_006:1",
       "seeded-historical-refund",
       "cus_009",
