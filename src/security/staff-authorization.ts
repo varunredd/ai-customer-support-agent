@@ -44,6 +44,10 @@ export function resolveStaffTenantId(db: AppDatabase, auth: StaffAuthContext): s
   return ensureDefaultTenant(db);
 }
 
+export function resolveStaffActorUserId(auth: StaffAuthContext): string | null {
+  return auth.kind === "session" ? auth.session.userId : null;
+}
+
 export function staffSessionPayload(session: StaffSession) {
   return {
     email: session.email,

@@ -154,4 +154,252 @@ export class AdminReadRepository {
       };
     });
   }
+
+  listDecisions(limit = 80): AdminDecisionItem[] {
+    const safeLimit = Math.max(1, Math.min(200, Math.trunc(limit)));
+    const rows = this.db.prepare(`
+      SELECT
+        ar.id AS run_id,
+        ar.status AS run_status,
+        ar.customer_id,
+        c.name AS customer_name,
+        ar.order_id,
+        ar.started_at,
+        ar.completed_at,
+        e.status AS decision_status,
+        e.metadata_json AS decision_metadata_json,
+        r.id AS refund_id,
+        r.amount_cents AS refund_amount_cents,
+        r.policy_version AS refund_policy_version,
+        a.id AS approval_id,
+        a.status AS approval_status,
+        a.amount_cents AS approval_amount_cents,
+        a.policy_version AS approval_policy_version,
+        esc.id AS escalation_id,
+        esc.status AS escalation_status
+      FROM agent_runs ar
+      LEFT JOIN customers c ON c.id = ar.customer_id AND c.tenant_id = ar.tenant_id
+      LEFT JOIN agent_events e ON e.id = (
+        SELECT e2.id FROM agent_events e2
+        WHERE e2.run_id = ar.id AND e2.type = 'DECISION'
+        ORDER BY e2.sequence DESC LIMIT 1
+      )
+      LEFT JOIN refunds r ON r.id = (
+        SELECT r2.id FROM refunds r2
+        WHERE r2.run_id = ar.id AND r2.tenant_id = ar.tenant_id
+        ORDER BY r2.created_at DESC LIMIT 1
+      )
+      LEFT JOIN refund_approval_requests a ON a.id = (
+        SELECT a2.id FROM refund_approval_requests a2
+        WHERE a2.run_id = ar.id AND a2.tenant_id = ar.tenant_id
+        ORDER BY a2.created_at DESC LIMIT 1
+      )
+      LEFT JOIN support_escalations esc ON esc.run_id = ar.id AND esc.tenant_id = ar.tenant_id
+      WHERE ar.tenant_id = ?
+        AND (e.id IS NOT NULL OR r.id IS NOT NULL OR a.id IS NOT NULL OR esc.id IS NOT NULL)
+      ORDER BY ar.started_at DESC
+      LIMIT ?
+    `).all(this.tenantId, safeLimit) as DecisionRow[];
+
+    return rows.map((row) => {
+      const parsed = parseDecision(row.decision_metadata_json);
+      const outcome = deriveDecisionOutcome(row, parsed.decision);
+      return {
+        runId: row.run_id,
+        runStatus: row.run_status,
+        customerId: row.customer_id,
+        customerName: row.customer_name,
+        orderId: row.order_id,
+        startedAt: row.started_at,
+        completedAt: row.completed_at,
+        outcome,
+        policyVersion: row.refund_policy_version ?? row.approval_policy_version,
+        refundId: row.refund_id,
+        refundAmountCents: row.refund_amount_cents ?? parsed.refundAmountCents ?? row.approval_amount_cents,
+        approvalId: row.approval_id,
+        approvalStatus: row.approval_status,
+        escalationId: row.escalation_id,
+        escalationStatus: row.escalation_status,
+      };
+    });
+  }
+
+  getAnalyticsSnapshot(): AdminAnalyticsSnapshot {
+    const count = (sql: string, ...params: unknown[]) =>
+      (this.db.prepare(sql).get(...params) as { count: number }).count;
+
+    const runsTotal = count("SELECT COUNT(*) AS count FROM agent_runs WHERE tenant_id = ?", this.tenantId);
+    const runsCompleted = count("SELECT COUNT(*) AS count FROM agent_runs WHERE tenant_id = ? AND status = 'COMPLETED'", this.tenantId);
+    const runsFailed = count("SELECT COUNT(*) AS count FROM agent_runs WHERE tenant_id = ? AND status = 'FAILED'", this.tenantId);
+    const policyApprovals = count(`
+      SELECT COUNT(*) AS count FROM agent_events e
+      JOIN agent_runs ar ON ar.id = e.run_id
+      WHERE ar.tenant_id = ? AND e.type = 'DECISION' AND json_extract(e.metadata_json, '$.decision') = 'APPROVE'
+    `, this.tenantId);
+    const policyDenials = count(`
+      SELECT COUNT(*) AS count FROM agent_events e
+      JOIN agent_runs ar ON ar.id = e.run_id
+      WHERE ar.tenant_id = ? AND e.type = 'DECISION' AND json_extract(e.metadata_json, '$.decision') = 'DENY'
+    `, this.tenantId);
+    const refunds = this.db.prepare(`
+      SELECT COUNT(*) AS count, COALESCE(SUM(amount_cents), 0) AS cents
+      FROM refunds WHERE tenant_id = ?
+    `).get(this.tenantId) as { count: number; cents: number };
+    const pendingApprovals = count("SELECT COUNT(*) AS count FROM refund_approval_requests WHERE tenant_id = ? AND status = 'PENDING'", this.tenantId);
+    const managerApproved = count("SELECT COUNT(*) AS count FROM refund_approval_requests WHERE tenant_id = ? AND status = 'APPROVED'", this.tenantId);
+    const openEscalations = count("SELECT COUNT(*) AS count FROM support_escalations WHERE tenant_id = ? AND status = 'OPEN'", this.tenantId);
+    const conversations = count("SELECT COUNT(*) AS count FROM support_sessions WHERE tenant_id = ?", this.tenantId);
+    const automatedRefunds = Math.max(0, refunds.count - managerApproved);
+    const decidedOutcomes = automatedRefunds + managerApproved + pendingApprovals + policyDenials;
+    const automationRate = decidedOutcomes > 0 ? automatedRefunds / decidedOutcomes : 0;
+
+    return {
+      runsTotal,
+      runsCompleted,
+      runsFailed,
+      policyApprovals,
+      policyDenials,
+      refundCount: refunds.count,
+      refundedCents: refunds.cents,
+      pendingApprovals,
+      managerApproved,
+      openEscalations,
+      conversations,
+      automationRate,
+    };
+  }
+
+  getIntegrationStatus(): AdminIntegrationStatus {
+    const lastEvent = this.db.prepare(`
+      SELECT source, status, created_at FROM integration_events
+      WHERE tenant_id = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(this.tenantId) as { source: string; status: string; created_at: string } | undefined;
+
+    const commerceUrl = process.env.ECOMMERCE_BASE_URL?.trim().replace(/\/$/, "") || null;
+    const commerceSecret = (process.env.BUSINESS_INTEGRATION_SECRET?.trim().length ?? 0) >= 32;
+    const emailKey = Boolean(process.env.RESEND_API_KEY?.trim());
+
+    return {
+      commerce: {
+        configured: Boolean(commerceUrl && commerceSecret),
+        host: commerceHost(commerceUrl),
+        lastEventAt: lastEvent?.created_at ?? null,
+        lastEventStatus: lastEvent?.status ?? null,
+        lastEventSource: lastEvent?.source ?? null,
+      },
+      email: {
+        configured: emailKey,
+        deliveryMode: process.env.NOTIFICATION_DELIVERY_MODE?.trim() || "worker",
+      },
+      webhooks: {
+        configured: false,
+        note: "Per-tenant outbound webhooks ship in the next production step.",
+      },
+    };
+  }
+}
+
+export type AdminDecisionOutcome =
+  | "AUTO_APPROVED"
+  | "MANUALLY_APPROVED"
+  | "DENIED_BY_POLICY"
+  | "DENIED_BY_MANAGER"
+  | "REQUIRES_APPROVAL"
+  | "ESCALATED_TO_HUMAN";
+
+export interface AdminDecisionItem {
+  runId: string;
+  runStatus: AgentRunStatus;
+  customerId: string | null;
+  customerName: string | null;
+  orderId: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  outcome: AdminDecisionOutcome;
+  policyVersion: string | null;
+  refundId: string | null;
+  refundAmountCents: number | null;
+  approvalId: string | null;
+  approvalStatus: "PENDING" | "APPROVED" | "REJECTED" | null;
+  escalationId: string | null;
+  escalationStatus: "OPEN" | "RESOLVED" | null;
+}
+
+export interface AdminAnalyticsSnapshot {
+  runsTotal: number;
+  runsCompleted: number;
+  runsFailed: number;
+  policyApprovals: number;
+  policyDenials: number;
+  refundCount: number;
+  refundedCents: number;
+  pendingApprovals: number;
+  managerApproved: number;
+  openEscalations: number;
+  conversations: number;
+  automationRate: number;
+}
+
+export interface AdminIntegrationStatus {
+  commerce: {
+    configured: boolean;
+    host: string | null;
+    lastEventAt: string | null;
+    lastEventStatus: string | null;
+    lastEventSource: string | null;
+  };
+  email: {
+    configured: boolean;
+    deliveryMode: string;
+  };
+  webhooks: {
+    configured: boolean;
+    note: string;
+  };
+}
+
+interface DecisionRow {
+  run_id: string;
+  run_status: AgentRunStatus;
+  customer_id: string | null;
+  customer_name: string | null;
+  order_id: string | null;
+  started_at: string;
+  completed_at: string | null;
+  decision_status: AgentEventStatus | null;
+  decision_metadata_json: string | null;
+  refund_id: string | null;
+  refund_amount_cents: number | null;
+  refund_policy_version: string | null;
+  approval_id: string | null;
+  approval_status: "PENDING" | "APPROVED" | "REJECTED" | null;
+  approval_amount_cents: number | null;
+  approval_policy_version: string | null;
+  escalation_id: string | null;
+  escalation_status: "OPEN" | "RESOLVED" | null;
+}
+
+function commerceHost(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
+}
+
+function deriveDecisionOutcome(
+  row: DecisionRow,
+  decision: "APPROVE" | "DENY" | null,
+): AdminDecisionOutcome {
+  if (row.approval_status === "PENDING") return "REQUIRES_APPROVAL";
+  if (row.approval_status === "REJECTED") return "DENIED_BY_MANAGER";
+  if (row.approval_status === "APPROVED" && row.refund_id) return "MANUALLY_APPROVED";
+  if (row.refund_id) return "AUTO_APPROVED";
+  if (decision === "DENY") return "DENIED_BY_POLICY";
+  if (row.escalation_id) return "ESCALATED_TO_HUMAN";
+  if (decision === "APPROVE") return "AUTO_APPROVED";
+  return "ESCALATED_TO_HUMAN";
 }

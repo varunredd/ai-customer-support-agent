@@ -14,6 +14,9 @@ export interface SupportEscalation {
   summary: string;
   priority: EscalationPriority;
   status: EscalationStatus;
+  assignedUserId: string | null;
+  notes: string | null;
+  resolvedByUserId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,6 +30,9 @@ interface Row {
   summary: string;
   priority: EscalationPriority;
   status: EscalationStatus;
+  assigned_user_id: string | null;
+  notes: string | null;
+  resolved_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +47,9 @@ function map(row: Row): SupportEscalation {
     summary: row.summary,
     priority: row.priority,
     status: row.status,
+    assignedUserId: row.assigned_user_id,
+    notes: row.notes,
+    resolvedByUserId: row.resolved_by_user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -75,6 +84,11 @@ export class SupportEscalationRepository {
     return this.findByRunId(input.runId)!;
   }
 
+  findById(id: string): SupportEscalation | null {
+    const row = this.db.prepare("SELECT * FROM support_escalations WHERE tenant_id = ? AND id = ?").get(this.tenantId, id) as Row | undefined;
+    return row ? map(row) : null;
+  }
+
   findByRunId(runId: string): SupportEscalation | null {
     const row = this.db.prepare("SELECT * FROM support_escalations WHERE tenant_id = ? AND run_id = ?").get(this.tenantId, runId) as Row | undefined;
     return row ? map(row) : null;
@@ -103,5 +117,38 @@ export class SupportEscalationRepository {
       ORDER BY CASE priority WHEN 'HIGH' THEN 0 ELSE 1 END, created_at DESC
       LIMIT ?
     `).all(this.tenantId, safeLimit) as Row[]).map(map);
+  }
+
+  assign(id: string, input: { assignedUserId: string | null; notes?: string | null }): SupportEscalation {
+    const current = this.findById(id);
+    if (!current) throw new Error("Escalation was not found.");
+    if (current.status !== "OPEN") throw new Error("Resolved escalations cannot be reassigned.");
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      UPDATE support_escalations
+      SET assigned_user_id = ?, notes = COALESCE(?, notes), updated_at = ?
+      WHERE tenant_id = ? AND id = ? AND status = 'OPEN'
+    `).run(input.assignedUserId, input.notes?.slice(0, 1000) ?? null, now, this.tenantId, id);
+    return this.findById(id)!;
+  }
+
+  resolve(id: string, input: { resolvedByUserId: string | null; notes?: string | null }): SupportEscalation {
+    const current = this.findById(id);
+    if (!current) throw new Error("Escalation was not found.");
+    if (current.status === "RESOLVED") return current;
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      UPDATE support_escalations
+      SET status = 'RESOLVED',
+          resolved_by_user_id = ?,
+          notes = COALESCE(?, notes),
+          updated_at = ?
+      WHERE tenant_id = ? AND id = ? AND status = 'OPEN'
+    `).run(input.resolvedByUserId, input.notes?.slice(0, 1000) ?? null, now, this.tenantId, id);
+    const updated = this.findById(id);
+    if (!updated || updated.status !== "RESOLVED") {
+      throw new Error("Escalation could not be resolved.");
+    }
+    return updated;
   }
 }

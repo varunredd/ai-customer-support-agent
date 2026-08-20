@@ -1,5 +1,6 @@
 import { getDatabase } from "@/db/database";
 import { asObject, jsonError } from "@/lib/http";
+import { AuditLogRepository } from "@/repositories/audit-log.repository";
 import { requireStaffPermission, resolveStaffTenantId } from "@/security/staff-authorization";
 import { StaffUserError, updateTenantStaffUser } from "@/services/auth/staff-user.service";
 import type { StaffUserStatus } from "@/domain/auth/types";
@@ -26,6 +27,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     const role = typeof body.role === "string" ? body.role : undefined;
     const status = readOptionalStatus(body);
     const user = updateTenantStaffUser(db, tenantId, actorUserId, userId, { role, status });
+    new AuditLogRepository(db, tenantId).record({
+      actorUserId: actorUserId || null,
+      action: "STAFF_USER_UPDATED",
+      resourceType: "user",
+      resourceId: user.id,
+      metadata: { role: user.role, status: user.status },
+    });
     return Response.json({ user }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof StaffUserError) {

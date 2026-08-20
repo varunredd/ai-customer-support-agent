@@ -1,7 +1,8 @@
 import { getDatabase } from "@/db/database";
 import { asObject, jsonError } from "@/lib/http";
+import { AuditLogRepository } from "@/repositories/audit-log.repository";
 import { RefundApprovalRepository } from "@/repositories/refund-approval.repository";
-import { requireStaffPermission, resolveStaffTenantId } from "@/security/staff-authorization";
+import { requireStaffPermission, resolveStaffActorUserId, resolveStaffTenantId } from "@/security/staff-authorization";
 import { approveRefundApproval, rejectRefundApproval } from "@/services/refund-execution.service";
 
 export const runtime = "nodejs";
@@ -32,10 +33,26 @@ export async function POST(request: Request) {
     const actorUserId = auth.kind === "session" ? auth.session.userId : "usr_control_token";
     if (decision === "REJECT") {
       const approval = rejectRefundApproval(db, approvalId, actorUserId, note, tenantId);
+      new AuditLogRepository(db, tenantId).record({
+        actorUserId: resolveStaffActorUserId(auth),
+        action: "REFUND_REJECTED",
+        resourceType: "refund_approval",
+        resourceId: approval.id,
+        metadata: { orderId: approval.orderId, amountCents: approval.amountCents },
+      });
       return Response.json({ approval }, { headers: { "Cache-Control": "no-store" } });
     }
     const result = approveRefundApproval(db, approvalId, actorUserId, note, tenantId);
     const approval = new RefundApprovalRepository(db, tenantId).findById(approvalId);
+    if (approval) {
+      new AuditLogRepository(db, tenantId).record({
+        actorUserId: resolveStaffActorUserId(auth),
+        action: "REFUND_APPROVED",
+        resourceType: "refund_approval",
+        resourceId: approval.id,
+        metadata: { orderId: approval.orderId, amountCents: approval.amountCents },
+      });
+    }
     return Response.json({ approval, result }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return jsonError(400, "APPROVAL_DECISION_FAILED", error instanceof Error ? error.message : "Unable to decide approval.");

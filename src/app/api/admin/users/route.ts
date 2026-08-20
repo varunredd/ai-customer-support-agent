@@ -1,6 +1,7 @@
 import { getDatabase } from "@/db/database";
 import { asObject, jsonError, readNonEmptyString } from "@/lib/http";
-import { requireStaffPermission, resolveStaffTenantId } from "@/security/staff-authorization";
+import { AuditLogRepository } from "@/repositories/audit-log.repository";
+import { requireStaffPermission, resolveStaffActorUserId, resolveStaffTenantId } from "@/security/staff-authorization";
 import { createTenantStaffUser, listTenantStaffUsers, StaffUserError } from "@/services/auth/staff-user.service";
 
 export const runtime = "nodejs";
@@ -25,6 +26,13 @@ export async function POST(request: Request) {
     const password = readNonEmptyString(body, "password", 256);
     const role = readNonEmptyString(body, "role", 64);
     const user = createTenantStaffUser(db, tenantId, { email, password, role });
+    new AuditLogRepository(db, tenantId).record({
+      actorUserId: resolveStaffActorUserId(auth),
+      action: "STAFF_USER_CREATED",
+      resourceType: "user",
+      resourceId: user.id,
+      metadata: { email: user.email, role: user.role },
+    });
     return Response.json({ user }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof StaffUserError) {

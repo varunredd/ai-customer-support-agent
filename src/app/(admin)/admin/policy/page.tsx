@@ -19,7 +19,7 @@ export default function PolicyPage() {
   return (
     <div className="admin-page">
       <div className="admin-stack admin-stack-wide">
-        <PageHeader title="Refund Policy" />
+        <PageHeader title="Policies" description="Draft, validate, and publish the refund rule set the agent must follow." />
         <PolicyManager initialPolicy={policy} initialPolicies={policies} />
       </div>
     </div>

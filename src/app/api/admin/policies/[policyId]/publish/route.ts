@@ -1,6 +1,7 @@
 import { getDatabase } from "@/db/database";
+import { AuditLogRepository } from "@/repositories/audit-log.repository";
 import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
-import { requireStaffPermission } from "@/security/staff-authorization";
+import { requireStaffPermission, resolveStaffActorUserId } from "@/security/staff-authorization";
 import { validatePersistedPolicy } from "@/services/policy/policy-lifecycle.service";
 
 export const runtime = "nodejs";
@@ -26,6 +27,13 @@ export async function POST(request: Request, context: { params: Promise<{ policy
       }, { status: 400 });
     }
     const policy = repository.publish(policyId);
+    new AuditLogRepository(getDatabase()).record({
+      actorUserId: resolveStaffActorUserId(auth),
+      action: "POLICY_PUBLISHED",
+      resourceType: "refund_policy",
+      resourceId: policy.id,
+      metadata: { version: policy.version, status: policy.status },
+    });
     return Response.json({
       policy,
       policies: repository.list(),

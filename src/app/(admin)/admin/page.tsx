@@ -40,6 +40,7 @@ export default function AdminOverviewPage() {
     <div className="admin-page">
       <div className="admin-stack">
         <PageHeader title="Overview">
+          <Link href="/admin/conversations" className="table-link">Conversations</Link>
           <Link href="/support" className="primary-link">Open support</Link>
         </PageHeader>
 
@@ -47,7 +48,7 @@ export default function AdminOverviewPage() {
           <StatCard label="Customers" value={String(customerCount)} hint={`${suspended} suspended · ${highRisk} high risk`} icon={<Users size={16} />} />
           <StatCard label="Orders" value={String(orderCount)} hint="In Jobform" icon={<Activity size={16} />} />
           <StatCard label="Runs today" value={String(todayRuns)} hint={`${completedToday} done`} icon={<CheckCircle2 size={16} />} />
-          <StatCard label="Policy" value={activePolicy ? `${policyRuleCount} rules` : "None"} hint={activePolicy ? `${deniedCount} denials` : "Create in Refund Policy"} tone={activePolicy ? "success" : "warning"} icon={<ShieldAlert size={16} />} />
+          <StatCard label="Policy" value={activePolicy ? `${policyRuleCount} ${policyRuleCount === 1 ? "rule" : "rules"}` : "None"} hint={activePolicy ? `${deniedCount} denials` : "Create in Policies"} tone={activePolicy ? "success" : "warning"} icon={<ShieldAlert size={16} />} />
         </div>
 
         <div className="content-grid">

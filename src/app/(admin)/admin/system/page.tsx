@@ -20,7 +20,7 @@ export default function SystemPage() {
   return (
     <div className="admin-page">
       <div className="admin-stack">
-        <PageHeader title="System" />
+        <PageHeader title="Settings" />
         <section className="panel">
           <div className="panel-header"><h2 className="panel-title">Events</h2></div>
           <div className="table-container">

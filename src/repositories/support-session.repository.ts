@@ -48,6 +48,34 @@ function mapMessage(row: SupportMessageRow): SupportMessage {
   };
 }
 
+export interface AdminConversationSummary {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  orderId: string;
+  status: SupportSessionStatus;
+  messageCount: number;
+  lastMessagePreview: string | null;
+  lastMessageRole: SupportMessageRole | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ConversationSummaryRow {
+  id: string;
+  customer_id: string;
+  customer_name: string;
+  customer_email: string;
+  order_id: string;
+  status: SupportSessionStatus;
+  message_count: number;
+  last_message_preview: string | null;
+  last_message_role: SupportMessageRole | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export class SupportSessionRepository {
   private readonly tenantId: string;
 
@@ -120,8 +148,59 @@ export class SupportSessionRepository {
 
   listMessages(sessionId: string): SupportMessage[] {
     const rows = this.db
-      .prepare("SELECT * FROM support_messages WHERE session_id = ? ORDER BY created_at, rowid")
-      .all(sessionId) as SupportMessageRow[];
+      .prepare(`
+        SELECT m.* FROM support_messages m
+        JOIN support_sessions s ON s.id = m.session_id
+        WHERE s.tenant_id = ? AND m.session_id = ?
+        ORDER BY m.created_at, m.rowid
+      `)
+      .all(this.tenantId, sessionId) as SupportMessageRow[];
     return rows.map(mapMessage);
+  }
+
+  listConversations(limit = 80): AdminConversationSummary[] {
+    const safeLimit = Math.max(1, Math.min(200, Math.trunc(limit)));
+    const rows = this.db.prepare(`
+      SELECT s.id, s.customer_id, c.name AS customer_name, c.email AS customer_email, s.order_id, s.status,
+             s.created_at, s.updated_at,
+             (SELECT COUNT(*) FROM support_messages m WHERE m.session_id = s.id) AS message_count,
+             (SELECT m.content FROM support_messages m WHERE m.session_id = s.id ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) AS last_message_preview,
+             (SELECT m.role FROM support_messages m WHERE m.session_id = s.id ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) AS last_message_role
+      FROM support_sessions s
+      JOIN customers c ON c.id = s.customer_id AND c.tenant_id = s.tenant_id
+      WHERE s.tenant_id = ?
+      ORDER BY s.updated_at DESC
+      LIMIT ?
+    `).all(this.tenantId, safeLimit) as ConversationSummaryRow[];
+
+    return rows.map((row) => ({
+      id: row.id,
+      customerId: row.customer_id,
+      customerName: row.customer_name,
+      customerEmail: row.customer_email,
+      orderId: row.order_id,
+      status: row.status,
+      messageCount: row.message_count,
+      lastMessagePreview: row.last_message_preview ? row.last_message_preview.slice(0, 180) : null,
+      lastMessageRole: row.last_message_role,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  }
+
+  getConversation(sessionId: string): { session: SupportSession; messages: SupportMessage[]; customerName: string; customerEmail: string } | null {
+    const row = this.db.prepare(`
+      SELECT s.*, c.name AS customer_name, c.email AS customer_email
+      FROM support_sessions s
+      JOIN customers c ON c.id = s.customer_id AND c.tenant_id = s.tenant_id
+      WHERE s.tenant_id = ? AND s.id = ?
+    `).get(this.tenantId, sessionId) as (SupportSessionRow & { customer_name: string; customer_email: string }) | undefined;
+    if (!row) return null;
+    return {
+      session: mapSession(row),
+      messages: this.listMessages(sessionId),
+      customerName: row.customer_name,
+      customerEmail: row.customer_email,
+    };
   }
 }

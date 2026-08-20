@@ -481,6 +481,32 @@ export const MIGRATIONS: DatabaseMigration[] = [
         ON refund_approval_requests(tenant_id, status, created_at DESC);
     `,
   },
+
+  {
+    version: 7,
+    name: "phase7_admin_console",
+    sql: `
+      CREATE TABLE audit_logs (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id),
+        actor_user_id TEXT,
+        action TEXT NOT NULL,
+        resource_type TEXT NOT NULL,
+        resource_id TEXT,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_audit_logs_tenant_created
+        ON audit_logs(tenant_id, created_at DESC);
+      CREATE INDEX idx_audit_logs_tenant_resource
+        ON audit_logs(tenant_id, resource_type, created_at DESC);
+
+      ALTER TABLE support_escalations ADD COLUMN assigned_user_id TEXT;
+      ALTER TABLE support_escalations ADD COLUMN notes TEXT;
+      ALTER TABLE support_escalations ADD COLUMN resolved_by_user_id TEXT;
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.at(-1)?.version ?? 0;

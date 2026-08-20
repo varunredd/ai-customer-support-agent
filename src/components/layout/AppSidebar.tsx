@@ -1,9 +1,26 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, Bot, ClipboardCheck, FileText, LayoutDashboard, LogOut, MessageSquare, Receipt, ServerCog, Shield, UserRoundCheck, Users } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  Bot,
+  ClipboardCheck,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
+  Plug,
+  Receipt,
+  ScrollText,
+  ServerCog,
+  Shield,
+  UserRoundCheck,
+  Users,
+} from "lucide-react";
 import clsx from "clsx";
 import { formatStaffRole } from "@/lib/format";
 import type { StaffRole } from "@/domain/auth/types";
@@ -11,6 +28,58 @@ import type { StaffPermission } from "@/security/rbac";
 import styles from "./AppSidebar.module.css";
 
 const PUBLIC_PATHS = ["/", "/support", "/login", "/privacy", "/terms"];
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: ReactNode;
+  exact?: boolean;
+  permission?: StaffPermission;
+};
+
+const NAV_SECTIONS: Array<{ label: string; items: NavItem[] }> = [
+  {
+    label: "Overview",
+    items: [{ href: "/admin", label: "Overview", icon: <LayoutDashboard size={16} />, exact: true }],
+  },
+  {
+    label: "Support",
+    items: [
+      { href: "/admin/conversations", label: "Conversations", icon: <MessageSquare size={16} /> },
+      { href: "/admin/customers", label: "Customers", icon: <Users size={16} /> },
+      { href: "/admin/refunds", label: "Refunds", icon: <Receipt size={16} /> },
+      { href: "/admin/escalations", label: "Escalations", icon: <UserRoundCheck size={16} />, permission: "escalations:manage" },
+      { href: "/admin/approvals", label: "Approvals", icon: <ClipboardCheck size={16} />, permission: "refund:approve" },
+    ],
+  },
+  {
+    label: "AI ops",
+    items: [
+      { href: "/admin/runs", label: "Agent runs", icon: <Activity size={16} /> },
+      { href: "/admin/decisions", label: "Decisions", icon: <ScrollText size={16} /> },
+    ],
+  },
+  {
+    label: "Knowledge",
+    items: [{ href: "/admin/policy", label: "Policies", icon: <FileText size={16} /> }],
+  },
+  {
+    label: "Integrations",
+    items: [{ href: "/admin/integrations", label: "Commerce & email", icon: <Plug size={16} />, permission: "integrations:manage" }],
+  },
+  {
+    label: "Analytics",
+    items: [{ href: "/admin/analytics", label: "Analytics", icon: <BarChart3 size={16} />, permission: "analytics:view" }],
+  },
+  {
+    label: "Admin",
+    items: [
+      { href: "/admin/team", label: "Team", icon: <Shield size={16} />, permission: "team:manage" },
+      { href: "/admin/audit", label: "Audit log", icon: <ScrollText size={16} />, permission: "audit:view" },
+      { href: "/admin/system", label: "Settings", icon: <ServerCog size={16} /> },
+    ],
+  },
+];
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -48,6 +117,11 @@ export function AppSidebar() {
     router.refresh();
   }
 
+  function isActive(item: NavItem) {
+    if (item.exact) return pathname === item.href;
+    return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  }
+
   return (
     <aside className={styles.sidebar}>
       <div className={styles.header}>
@@ -63,57 +137,25 @@ export function AppSidebar() {
       </div>
 
       <nav className={styles.nav}>
-        <div className={styles.navSection}>
-          <p className={styles.sectionLabel}>Workspace</p>
-          <Link href="/support" className={clsx(styles.navItem, pathname.startsWith("/support") && styles.navItemActive)}>
-            <MessageSquare size={16} />
-            Customer portal
-          </Link>
-        </div>
-
-        <div className={styles.navSection}>
-          <p className={styles.sectionLabel}>Operations</p>
-          <Link href="/admin" className={clsx(styles.navItem, pathname === "/admin" && styles.navItemActive)}>
-            <LayoutDashboard size={16} />
-            Overview
-          </Link>
-          <Link href="/admin/runs" className={clsx(styles.navItem, pathname.startsWith("/admin/runs") && styles.navItemActive)}>
-            <Activity size={16} />
-            Runs
-          </Link>
-          <Link href="/admin/customers" className={clsx(styles.navItem, pathname.startsWith("/admin/customers") && styles.navItemActive)}>
-            <Users size={16} />
-            Customers
-          </Link>
-          <Link href="/admin/refunds" className={clsx(styles.navItem, pathname.startsWith("/admin/refunds") && styles.navItemActive)}>
-            <Receipt size={16} />
-            Refunds
-          </Link>
-          <Link href="/admin/escalations" className={clsx(styles.navItem, pathname.startsWith("/admin/escalations") && styles.navItemActive)}>
-            <UserRoundCheck size={16} />
-            Escalations
-          </Link>
-          {permissions.includes("refund:approve") ? (
-            <Link href="/admin/approvals" className={clsx(styles.navItem, pathname.startsWith("/admin/approvals") && styles.navItemActive)}>
-              <ClipboardCheck size={16} />
-              Approvals
-            </Link>
-          ) : null}
-          <Link href="/admin/policy" className={clsx(styles.navItem, pathname.startsWith("/admin/policy") && styles.navItemActive)}>
-            <FileText size={16} />
-            Refund Policy
-          </Link>
-          <Link href="/admin/system" className={clsx(styles.navItem, pathname.startsWith("/admin/system") && styles.navItemActive)}>
-            <ServerCog size={16} />
-            System
-          </Link>
-          {permissions.includes("team:manage") ? (
-            <Link href="/admin/team" className={clsx(styles.navItem, pathname.startsWith("/admin/team") && styles.navItemActive)}>
-              <Shield size={16} />
-              Team
-            </Link>
-          ) : null}
-        </div>
+        {NAV_SECTIONS.map((section) => {
+          const items = section.items.filter((item) => !item.permission || permissions.includes(item.permission));
+          if (items.length === 0) return null;
+          return (
+            <div key={section.label} className={styles.navSection}>
+              {section.label !== "Overview" ? <p className={styles.sectionLabel}>{section.label}</p> : null}
+              {items.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={clsx(styles.navItem, isActive(item) && styles.navItemActive)}
+                >
+                  {item.icon}
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          );
+        })}
       </nav>
 
       <div className={styles.footer}>
