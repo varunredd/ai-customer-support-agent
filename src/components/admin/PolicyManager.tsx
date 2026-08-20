@@ -442,7 +442,7 @@ export function PolicyManager({ initialPolicy, initialPolicies }: PolicyManagerP
   return (
     <div className={styles.manager}>
       {message ? <div className={styles.notice}>{message}</div> : null}
-      {validation ? (
+      {validation && selected?.status === "DRAFT" ? (
         <div className={styles.notice}>
           {validation.ok
             ? `Ready to publish · ${validation.enabledCount}/${validation.totalCatalogRules} checks enabled`

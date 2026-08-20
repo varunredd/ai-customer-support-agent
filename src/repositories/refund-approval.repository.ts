@@ -98,6 +98,16 @@ export class RefundApprovalRepository {
     return row ? map(row) : null;
   }
 
+  findLatestPendingForOrder(customerId: string, orderId: string): RefundApprovalRequest | null {
+    const row = this.db.prepare(`
+      SELECT * FROM refund_approval_requests
+      WHERE tenant_id = ? AND customer_id = ? AND order_id = ? AND status = 'PENDING'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(this.tenantId, customerId, orderId) as Row | undefined;
+    return row ? map(row) : null;
+  }
+
   listPending(limit = 100): RefundApprovalRequest[] {
     const safeLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
     return (this.db.prepare(`

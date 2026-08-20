@@ -22,7 +22,7 @@ export function HostedSupportPanel() {
           <LockKeyhole size={17} />
           <div>
             <strong>Session credential</strong>
-            <span>The browser keeps the exchanged session credential only in memory.</span>
+            <span>This browser tab keeps the exchanged session credential so you can resume if you reload.</span>
           </div>
         </div>
         <div className={styles.row}>

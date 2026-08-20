@@ -26,7 +26,7 @@ export function HostedSupportGate({ error }: { error?: string | null }) {
         <ShieldCheck size={17} />
         <div>
           <strong>Identity stays server-bound</strong>
-          <span>A short-lived launch is exchanged once for a support-session credential held in memory.</span>
+          <span>A short-lived launch is exchanged once for a support-session credential kept in this browser tab.</span>
         </div>
       </div>
 

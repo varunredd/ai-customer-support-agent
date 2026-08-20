@@ -77,4 +77,13 @@ export class TenantRepository {
       .run(DEFAULT_TENANT_ID, name, configuredSlug, now, now);
     return this.findById(DEFAULT_TENANT_ID)!;
   }
+
+  updateSettings(id: string, settings: Record<string, unknown>): TenantRecord {
+    const now = new Date().toISOString();
+    this.db.prepare("UPDATE tenants SET settings_json = ?, updated_at = ? WHERE id = ?")
+      .run(JSON.stringify(settings), now, id);
+    const updated = this.findById(id);
+    if (!updated) throw new Error("Tenant was not found.");
+    return updated;
+  }
 }

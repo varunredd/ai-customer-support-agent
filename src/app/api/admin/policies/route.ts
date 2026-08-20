@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const version = typeof body.version === "string" && body.version.trim()
       ? body.version.trim()
       : nextDraftVersionLabel(existing.map((policy) => policy.version));
-    const rules = parseRules(body) ?? (sourcePolicyId ? undefined : catalogRuleTemplates());
+    const rules = parseRules(body) ?? (sourcePolicyId ? undefined : catalogRuleTemplates({ enableCore: true }));
 
     const policy = repository.createDraft({
       version,

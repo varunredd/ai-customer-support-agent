@@ -147,7 +147,7 @@ export class RefundPolicyRepository {
     }
     const rules = input.rules !== undefined
       ? normalizeRules(input.rules)
-      : normalizeRules(cloneRules(catalogRuleTemplates()));
+      : normalizeRules(cloneRules(catalogRuleTemplates({ enableCore: true })));
     const id = `pol_${randomUUID()}`;
     const now = new Date().toISOString();
     this.db.prepare("DELETE FROM refund_policy_versions WHERE tenant_id = ? AND status = 'DRAFT'").run(this.tenantId);
@@ -188,7 +188,7 @@ export class RefundPolicyRepository {
       rules = cloneRules(source.rules);
     }
     if (!rules) {
-      rules = cloneRules(catalogRuleTemplates());
+      rules = cloneRules(catalogRuleTemplates({ enableCore: true }));
     }
 
     const normalized = normalizeRules(rules);

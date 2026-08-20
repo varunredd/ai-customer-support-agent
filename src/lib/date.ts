@@ -9,3 +9,12 @@ export function differenceInCalendarDays(laterIso: string, earlierIso: string): 
   const earlierUtcDay = Date.UTC(earlier.getUTCFullYear(), earlier.getUTCMonth(), earlier.getUTCDate());
   return Math.floor((laterUtcDay - earlierUtcDay) / MS_PER_DAY);
 }
+
+export function addUtcDays(iso: string, days: number): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Invalid ISO date supplied to refund evaluator");
+  }
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString();
+}

@@ -22,6 +22,14 @@ export type SupportOutcome =
       approvalId: string | null;
       title: string;
       description: string;
+    }
+  | {
+      kind: "ESCALATED";
+      amountCents: 0;
+      refundId: null;
+      escalationId: string | null;
+      title: string;
+      description: string;
     };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -93,5 +101,64 @@ export function supportOutcomeFromEvent(event: PersistedAgentEvent): SupportOutc
     };
   }
 
+  if (event.type === "ESCALATION") {
+    return {
+      kind: "ESCALATED",
+      amountCents: 0,
+      refundId: null,
+      escalationId: typeof metadata.escalationId === "string" ? metadata.escalationId : null,
+      title: "A specialist will take it from here",
+      description: "This request was handed to a human support specialist. You will receive an update on this order.",
+    };
+  }
+
   return null;
+}
+
+export function supportOutcomeFromWorkspace(workspace: {
+  policyChecks: Array<{ passed: boolean; summary: string }>;
+  pendingApprovalId: string | null;
+  escalation: { id: string; summary: string } | null;
+  refundedCents: number;
+}): SupportOutcome | null {
+  if (workspace.escalation) {
+    return {
+      kind: "ESCALATED",
+      amountCents: 0,
+      refundId: null,
+      escalationId: workspace.escalation.id,
+      title: "A specialist will take it from here",
+      description: workspace.escalation.summary,
+    };
+  }
+  if (workspace.pendingApprovalId) {
+    return {
+      kind: "PENDING_APPROVAL",
+      amountCents: 0,
+      refundId: null,
+      approvalId: workspace.pendingApprovalId,
+      title: "Manager approval required",
+      description: "This refund passed policy checks but exceeds the automatic approval limit. A support manager will review it.",
+    };
+  }
+  if (workspace.policyChecks.length === 0) return null;
+  const blocked = workspace.policyChecks.find((check) => !check.passed);
+  if (blocked) {
+    return {
+      kind: "DENIED",
+      amountCents: 0,
+      refundId: null,
+      title: "Refund not eligible",
+      description: blocked.summary,
+    };
+  }
+  return {
+    kind: "APPROVED",
+    amountCents: workspace.refundedCents,
+    refundId: null,
+    title: workspace.refundedCents > 0 ? "Refund completed" : "Refund eligible",
+    description: workspace.refundedCents > 0
+      ? "The approved refund was recorded successfully."
+      : "The request passed the deterministic refund-policy checks.",
+  };
 }

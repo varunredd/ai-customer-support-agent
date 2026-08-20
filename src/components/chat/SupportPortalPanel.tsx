@@ -1,13 +1,16 @@
 import { ShieldCheck } from "lucide-react";
 import styles from "./SupportSetupPanel.module.css";
 
-export function SupportPortalPanel() {
+export function SupportPortalPanel({ merchantName }: { merchantName?: string }) {
+  const storeName = merchantName?.trim() || "this store";
   return (
     <div className={styles.panel}>
       <section className={styles.section}>
         <p className="eyebrow">How support starts</p>
-        <h3 className={styles.name}>Order lookup</h3>
-        <p className={styles.meta}>Jobform matches the email and order ID to a customer-owned order before chat begins.</p>
+        <h3 className={styles.name}>Choose an order</h3>
+        <p className={styles.meta}>
+          {storeName} matches your email to customer-owned orders. You pick the order; the agent cannot switch accounts later.
+        </p>
       </section>
 
       <section className={styles.section}>
@@ -15,7 +18,7 @@ export function SupportPortalPanel() {
         <ol className={styles.steps}>
           <li>Read the matched customer and order</li>
           <li>Apply the published refund policy</li>
-          <li>Record an approved refund or explain a denial</li>
+          <li>Record an approved refund, queue manager review, or explain a denial</li>
         </ol>
       </section>
 

@@ -50,6 +50,14 @@
   gap: 10px;
 }
 
+.brandLogo {
+  height: 28px;
+  width: auto;
+  max-width: 72px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
 .title {
   font-weight: 700;
   color: var(--text);

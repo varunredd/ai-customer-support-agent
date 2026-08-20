@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCcw } from "lucide-react";
 import type { PersistedAgentEvent } from "@/domain/agent/types";
@@ -9,6 +9,7 @@ import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ContextPanel } from "@/components/chat/ContextPanel";
 import { AgentActivityLog } from "@/components/chat/AgentActivityLog";
+import { EscalationCard } from "@/components/chat/EscalationCard";
 import { RefundOutcomeCard } from "@/components/chat/RefundOutcomeCard";
 import { HostedSupportGate } from "@/components/chat/HostedSupportGate";
 import { HostedSupportPanel } from "@/components/chat/HostedSupportPanel";
@@ -17,7 +18,10 @@ import { SupportPortalPanel } from "@/components/chat/SupportPortalPanel";
 import { useRealtimeTranscription } from "@/hooks/useRealtimeTranscription";
 import { attachSpeechAudio } from "@/lib/play-speech-audio";
 import { readSseResponse } from "@/lib/sse-client";
-import { supportOutcomeFromEvent, type SupportOutcome } from "@/lib/support-outcome";
+import { supportOutcomeFromEvent, supportOutcomeFromWorkspace, type SupportOutcome } from "@/lib/support-outcome";
+import { customerPolicyChecksFromUnknown } from "@/lib/customer-policy-checks";
+import { clearStoredSupportSession, readStoredSupportSession, writeStoredSupportSession } from "@/lib/support-session-storage";
+import type { TenantBranding } from "@/domain/tenant/branding";
 import styles from "./page.module.css";
 
 function formatMessageTime(value: string) {
@@ -31,6 +35,7 @@ function activityLabel(event: PersistedAgentEvent) {
   if (event.type === "POLICY_CHECK") return "Validating refund policy…";
   if (event.type === "DECISION") return event.status === "SUCCESS" ? "Refund eligibility confirmed." : "Policy check found a restriction.";
   if (event.type === "REFUND_EXECUTION") return event.status === "SUCCESS" ? "Refund recorded successfully." : "Refund execution was blocked.";
+  if (event.type === "ESCALATION") return "Connecting you with a support specialist…";
   return null;
 }
 
@@ -65,6 +70,7 @@ export default function SupportPage() {
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [voicePhase, setVoicePhase] = useState<"idle" | "generating" | "playing">("idle");
   const [voicePlaybackError, setVoicePlaybackError] = useState<string | null>(null);
+  const [branding, setBranding] = useState<TenantBranding | null>(null);
 
   const stopPlayback = useCallback(() => {
     const audio = audioRef.current;
@@ -164,7 +170,9 @@ export default function SupportPage() {
         throw new Error("Support session authorization is required.");
       }
       setSessionAccessToken(accessToken);
+      writeStoredSupportSession({ sessionId: sessionDetail.session.id, accessToken });
       setDetail(sessionDetail);
+      setBranding(sessionDetail.branding);
       setMessages(sessionDetail.messages);
       spokenMessageIdsRef.current.clear();
       const welcome = sessionDetail.messages.find((message) => message.role === "AGENT");
@@ -193,10 +201,42 @@ export default function SupportPage() {
         };
         setEntry(nextEntry);
 
+        try {
+          const brandingResponse = await fetch("/api/support/branding", { cache: "no-store" });
+          if (brandingResponse.ok) {
+            const brandingPayload = (await brandingResponse.json()) as TenantBranding;
+            if (typeof brandingPayload.name === "string" && brandingPayload.name.trim()) {
+              setBranding(brandingPayload);
+            }
+          }
+        } catch {
+          // Branding is optional; the workspace still works with tenant defaults.
+        }
+
         const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
         const launchToken = fragment.get("launch")?.trim() ?? "";
         if (window.location.hash) window.history.replaceState(null, "", "/support");
-        if (launchToken) await initializeSession({ launchToken });
+        if (launchToken) {
+          await initializeSession({ launchToken });
+          return;
+        }
+
+        const stored = readStoredSupportSession();
+        if (!stored) return;
+        const resumeResponse = await fetch(`/api/support/sessions/${encodeURIComponent(stored.sessionId)}`, {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${stored.accessToken}` },
+        });
+        if (!resumeResponse.ok) {
+          clearStoredSupportSession();
+          return;
+        }
+        const resumed = (await resumeResponse.json()) as SupportSessionDetail;
+        setSessionAccessToken(stored.accessToken);
+        setDetail(resumed);
+        setBranding(resumed.branding);
+        setMessages(resumed.messages);
+        setOutcome(supportOutcomeFromWorkspace(resumed.workspace));
       } catch (caught) {
         setEntry({ portal: false, host: true });
         setError(caught instanceof Error ? caught.message : "Unable to initialize support.");
@@ -204,16 +244,48 @@ export default function SupportPage() {
     })();
   }, [initializeSession]);
 
-  const refreshSession = async (sessionId: string) => {
+  const refreshSession = useCallback(async (sessionId: string, accessToken = sessionAccessToken) => {
     const response = await fetch(`/api/support/sessions/${encodeURIComponent(sessionId)}`, {
       cache: "no-store",
-      headers: sessionAccessToken ? { Authorization: `Bearer ${sessionAccessToken}` } : undefined,
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     });
-    if (!response.ok) return;
+    if (!response.ok) return null;
     const refreshed = (await response.json()) as SupportSessionDetail;
     setDetail(refreshed);
+    setBranding(refreshed.branding);
     setMessages(refreshed.messages);
-  };
+    setOutcome((current) => current ?? supportOutcomeFromWorkspace(refreshed.workspace));
+    return refreshed;
+  }, [sessionAccessToken]);
+
+  const sessionId = detail?.session.id ?? null;
+  const lastMessage = messages[messages.length - 1];
+  const awaitingAgentReply = Boolean(sessionId && lastMessage?.role === "CUSTOMER" && !isSending);
+
+  useEffect(() => {
+    if (!sessionId || !sessionAccessToken || !awaitingAgentReply) return;
+    let cancelled = false;
+    setActivity((current) => current ?? "Waiting for the support agent…");
+    const startedAt = Date.now();
+
+    void (async () => {
+      while (!cancelled && Date.now() - startedAt < 90_000) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        if (cancelled) return;
+        const refreshed = await refreshSession(sessionId, sessionAccessToken);
+        const latest = refreshed?.messages[refreshed.messages.length - 1];
+        if (latest?.role === "AGENT") {
+          if (!cancelled) setActivity(null);
+          return;
+        }
+      }
+      if (!cancelled) setActivity(null);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [awaitingAgentReply, refreshSession, sessionAccessToken, sessionId]);
 
   const handleSend = async (content: string) => {
     if (!detail || isSending) return;
@@ -262,6 +334,22 @@ export default function SupportPage() {
           if (label) setActivity(label);
           const nextOutcome = supportOutcomeFromEvent(agentEvent);
           if (nextOutcome) setOutcome(nextOutcome);
+          if (agentEvent.type === "POLICY_CHECK" && agentEvent.metadata) {
+            const policyVersion = typeof agentEvent.metadata.policyVersion === "string"
+              ? agentEvent.metadata.policyVersion
+              : null;
+            setDetail((previous) => {
+              if (!previous) return previous;
+              return {
+                ...previous,
+                workspace: {
+                  ...previous.workspace,
+                  policyChecks: customerPolicyChecksFromUnknown(agentEvent.metadata?.checks),
+                  policyVersion: policyVersion ?? previous.workspace.policyVersion,
+                },
+              };
+            });
+          }
         }
         if (event === "assistant_message" && data && typeof data === "object" && !Array.isArray(data)) {
           const assistantMessage = data as SupportMessage;
@@ -277,7 +365,10 @@ export default function SupportPage() {
       await refreshSession(detail.session.id);
       setActivity(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The support request failed.");
+      const aborted = caught instanceof Error && /abort|fetch/i.test(caught.message) && /abort/i.test(caught.message);
+      if (!aborted) {
+        setError(caught instanceof Error ? caught.message : "The support request failed.");
+      }
       setActivity(null);
       await refreshSession(detail.session.id);
     } finally {
@@ -298,6 +389,7 @@ export default function SupportPage() {
     voice.stop();
     stopPlayback();
     spokenMessageIdsRef.current.clear();
+    clearStoredSupportSession();
     setDetail(null);
     setSessionAccessToken(null);
     setMessages([]);
@@ -329,13 +421,27 @@ export default function SupportPage() {
           ? "Loading"
           : "Ready";
 
+  const merchantName = detail?.branding.name ?? branding?.name;
+  const merchantAccent = detail?.branding.accent ?? branding?.accent ?? null;
+  const merchantLogo = detail?.branding.logoUrl ?? branding?.logoUrl ?? null;
+  const layoutStyle = merchantAccent
+    ? {
+        "--accent": merchantAccent,
+        "--accent-hover": merchantAccent,
+        "--accent-text": merchantAccent,
+      } as CSSProperties
+    : undefined;
+
   return (
-    <div className={styles.layout}>
+    <div className={styles.layout} style={layoutStyle}>
       <div className={styles.chatArea}>
         <header className={styles.header}>
           <div className={styles.titleBlock}>
             <div className={styles.titleRow}>
-              <h1 className={styles.title}>Customer Support</h1>
+              {merchantLogo ? (
+                <img src={merchantLogo} alt="" className={styles.brandLogo} />
+              ) : null}
+              <h1 className={styles.title}>{merchantName ? `${merchantName} support` : "Customer Support"}</h1>
               <div className={styles.status}>
                 <span className={styles.statusDot} />
                 <span className={styles.statusText}>{supportStatus}</span>
@@ -367,7 +473,8 @@ export default function SupportPage() {
                 />
               ))}
               {activity ? <AgentActivityLog activity={activity} /> : null}
-              {outcome ? <RefundOutcomeCard outcome={outcome} /> : null}
+              {outcome && outcome.kind !== "ESCALATED" ? <RefundOutcomeCard outcome={outcome} /> : null}
+              {detail.workspace.escalation ? <EscalationCard escalation={detail.workspace.escalation} /> : null}
               {error ? (
                 <div className={styles.errorNotice} role="alert">
                   <strong>Request could not be completed</strong>
@@ -380,6 +487,7 @@ export default function SupportPage() {
               onStart={(input) => initializeSession(input).then(() => undefined)}
               isStarting={isStarting}
               sessionError={error}
+              merchantName={merchantName}
             />
           ) : entry === null ? (
             <div className={styles.accessLoading} role="status">Preparing support…</div>
@@ -411,9 +519,9 @@ export default function SupportPage() {
 
       <aside className={styles.contextArea}>
         {detail ? (
-          <ContextPanel customer={detail.customer} order={detail.order} />
+          <ContextPanel customer={detail.customer} order={detail.order} workspace={detail.workspace} />
         ) : entry?.portal ? (
-          <SupportPortalPanel />
+          <SupportPortalPanel merchantName={merchantName} />
         ) : (
           <HostedSupportPanel />
         )}

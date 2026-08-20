@@ -164,3 +164,66 @@
   font-weight: 700;
   color: var(--text);
 }
+
+.trackerCard {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trackerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkList li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+
+.checkList li span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.checkList li p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--muted-strong);
+  line-height: 1.4;
+}
+
+.checkPass span { color: var(--ok); }
+.checkFail span { color: var(--error); }
+
+.emptyChecks,
+.policyVersion {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.policyVersion {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+}

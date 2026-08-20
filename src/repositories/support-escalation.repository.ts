@@ -80,6 +80,16 @@ export class SupportEscalationRepository {
     return row ? map(row) : null;
   }
 
+  findLatestForOrder(customerId: string, orderId: string): SupportEscalation | null {
+    const row = this.db.prepare(`
+      SELECT * FROM support_escalations
+      WHERE tenant_id = ? AND customer_id = ? AND order_id = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(this.tenantId, customerId, orderId) as Row | undefined;
+    return row ? map(row) : null;
+  }
+
   listRecent(limit = 100): SupportEscalation[] {
     const safeLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
     return (this.db.prepare("SELECT * FROM support_escalations WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?").all(this.tenantId, safeLimit) as Row[]).map(map);
