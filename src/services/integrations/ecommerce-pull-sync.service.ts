@@ -3,6 +3,7 @@ import { getDatabase } from "@/db/database";
 import { operationalLog } from "@/lib/observability/system-logger";
 import { parseBusinessContextSnapshot, syncBusinessContext } from "@/services/integrations/business-sync.service";
 import { signIntegrationPayload } from "@/security/integration-signature";
+import { resolveCommerceCredentials } from "@/services/integrations/tenant-integration.service";
 
 export interface EcommercePullResult {
   ok: boolean;
@@ -12,27 +13,18 @@ export interface EcommercePullResult {
   syncedOrders?: number;
 }
 
-function integrationSecret() {
-  const secret = process.env.BUSINESS_INTEGRATION_SECRET?.trim();
-  if (!secret || secret.length < 32) return null;
-  return secret;
-}
-
-function ecommerceBaseUrl() {
-  const baseUrl = process.env.ECOMMERCE_BASE_URL?.trim().replace(/\/$/, "");
-  return baseUrl || null;
-}
-
 export function isEcommercePullConfigured() {
-  return Boolean(integrationSecret() && ecommerceBaseUrl());
+  return resolveCommerceCredentials(getDatabase()).configured;
 }
 
 export async function pullAllCustomersFromEcommerce(source: string): Promise<EcommercePullResult> {
-  const secret = integrationSecret();
-  const baseUrl = ecommerceBaseUrl();
-  if (!secret || !baseUrl) {
+  const db = getDatabase();
+  const commerce = resolveCommerceCredentials(db);
+  if (!commerce.configured || !commerce.baseUrl || !commerce.secret) {
     return { ok: false, skipped: true, reason: "ECOMMERCE_BASE_URL or BUSINESS_INTEGRATION_SECRET is not configured." };
   }
+  const secret = commerce.secret;
+  const baseUrl = commerce.baseUrl;
 
   const rawBody = JSON.stringify({ limit: 500 });
   const timestamp = String(Date.now());
@@ -58,7 +50,6 @@ export async function pullAllCustomersFromEcommerce(source: string): Promise<Eco
 
   const payload = await response.json() as { snapshots?: unknown[] };
   const snapshots = Array.isArray(payload.snapshots) ? payload.snapshots : [];
-  const db = getDatabase();
   let syncedCustomers = 0;
   let syncedOrders = 0;
 

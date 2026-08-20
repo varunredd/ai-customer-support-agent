@@ -140,7 +140,9 @@ test("integration status never returns secrets and viewers cannot open the page 
     const tenantId = ensureDefaultTenant(db);
     const status = new AdminReadRepository(db, tenantId).getIntegrationStatus();
     assert.equal(JSON.stringify(status).includes("super-secret"), false);
-    assert.equal("webhooks" in status, true);
+    assert.equal(typeof status.webhooks.configured, "boolean");
+    assert.equal(Array.isArray(status.webhooks.deliveries), true);
+    assert.equal("note" in status.webhooks, false);
 
     const viewer = new UserRepository(db).createUser({
       tenantId,

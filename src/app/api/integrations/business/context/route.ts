@@ -2,6 +2,7 @@ import { getDatabase } from "@/db/database";
 import { operationalLog } from "@/lib/observability/system-logger";
 import { IntegrationAuthenticationError, verifyIntegrationRequest } from "@/security/integration-signature";
 import { BusinessSyncValidationError, parseBusinessContextSnapshot, syncBusinessContext } from "@/services/integrations/business-sync.service";
+import { resolveCommerceCredentials } from "@/services/integrations/tenant-integration.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
   let eventId: string | null = null;
   try {
     const verified = verifyIntegrationRequest({
-      secret: process.env.BUSINESS_INTEGRATION_SECRET,
+      secret: resolveCommerceCredentials(db).secret ?? undefined,
       timestamp: request.headers.get("x-jobform-timestamp"),
       eventId: request.headers.get("x-jobform-event-id"),
       signature: request.headers.get("x-jobform-signature"),

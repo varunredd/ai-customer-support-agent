@@ -8,6 +8,7 @@ import { RefundApprovalRepository } from "@/repositories/refund-approval.reposit
 import { evaluateRefundEligibility } from "@/services/refund-eligibility.service";
 import { resolveAutoApproveMaxCents } from "@/services/refund-approval-threshold.service";
 import { resolveTenantId } from "@/services/tenant/tenant-context.service";
+import { emitOutboundWebhook } from "@/services/integrations/outbound-webhook.service";
 
 interface ExistingRefundRow {
   id: string;
@@ -355,7 +356,31 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
   });
 
   const result = executeTransaction.immediate();
+  if (result.status === "PENDING_APPROVAL" && result.approvalId) {
+    emitOutboundWebhook(db, {
+      eventType: "approval.required",
+      eventKey: `approval.required:${result.approvalId}`,
+      tenantId: tenant,
+      payload: {
+        approvalId: result.approvalId,
+        customerId: input.request.customerId,
+        orderId: input.request.orderId,
+        amountCents: result.evaluation.refundAmountCents,
+      },
+    });
+  }
   if (result.status === "COMPLETED" && !result.idempotentReplay && result.refund) {
+    emitOutboundWebhook(db, {
+      eventType: "refund.completed",
+      eventKey: `refund.completed:${result.refund.id}`,
+      tenantId: tenant,
+      payload: {
+        refundId: result.refund.id,
+        customerId: result.refund.customerId,
+        orderId: result.refund.orderId,
+        amountCents: result.refund.amountCents,
+      },
+    });
     void import("@/services/integrations/ecommerce-refund-notify.service").then(({ notifyEcommerceRefundCompleted }) =>
       notifyEcommerceRefundCompleted({
         refundId: result.refund!.id,
@@ -366,6 +391,7 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
         amountCents: result.refund!.amountCents,
         reason: result.refund!.reason,
         condition: result.refund!.condition,
+        tenantId: tenant,
       }),
     );
   }
@@ -519,6 +545,17 @@ export function approveRefundApproval(
     });
     const completed = forced.immediate();
     if (completed.status === "COMPLETED" && !completed.idempotentReplay && completed.refund) {
+      emitOutboundWebhook(db, {
+        eventType: "refund.completed",
+        eventKey: `refund.completed:${completed.refund.id}`,
+        tenantId: tenant,
+        payload: {
+          refundId: completed.refund.id,
+          customerId: completed.refund.customerId,
+          orderId: completed.refund.orderId,
+          amountCents: completed.refund.amountCents,
+        },
+      });
       void import("@/services/integrations/ecommerce-refund-notify.service").then(({ notifyEcommerceRefundCompleted }) =>
         notifyEcommerceRefundCompleted({
           refundId: completed.refund!.id,
@@ -529,6 +566,7 @@ export function approveRefundApproval(
           amountCents: completed.refund!.amountCents,
           reason: completed.refund!.reason,
           condition: completed.refund!.condition,
+          tenantId: tenant,
         }),
       );
     }

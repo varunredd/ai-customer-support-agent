@@ -507,6 +507,51 @@ export const MIGRATIONS: DatabaseMigration[] = [
       ALTER TABLE support_escalations ADD COLUMN resolved_by_user_id TEXT;
     `,
   },
+
+  {
+    version: 8,
+    name: "phase7_tenant_integrations",
+    sql: `
+      CREATE TABLE tenant_integrations (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id),
+        provider TEXT NOT NULL CHECK (provider IN ('commerce', 'email', 'webhook')),
+        status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'DISABLED')),
+        config_json TEXT NOT NULL DEFAULT '{}',
+        credentials_encrypted TEXT,
+        last_sync_at TEXT,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(tenant_id, provider)
+      );
+
+      CREATE INDEX idx_tenant_integrations_tenant
+        ON tenant_integrations(tenant_id, provider);
+
+      CREATE TABLE outbound_webhook_deliveries (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id),
+        event_type TEXT NOT NULL,
+        event_key TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('PENDING', 'SENT', 'DEAD')),
+        attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+        next_attempt_at TEXT NOT NULL,
+        last_error TEXT,
+        response_status INTEGER,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        sent_at TEXT,
+        UNIQUE(tenant_id, event_key)
+      );
+
+      CREATE INDEX idx_outbound_webhooks_dispatch
+        ON outbound_webhook_deliveries(status, next_attempt_at, created_at);
+      CREATE INDEX idx_outbound_webhooks_tenant
+        ON outbound_webhook_deliveries(tenant_id, created_at DESC);
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.at(-1)?.version ?? 0;

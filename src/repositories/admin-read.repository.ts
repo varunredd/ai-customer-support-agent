@@ -1,5 +1,6 @@
 import type { AppDatabase } from "@/db/database";
 import type { AgentEventStatus, AgentRunStatus } from "@/domain/agent/types";
+import { getPublicIntegrationStatus, type PublicIntegrationStatus } from "@/services/integrations/tenant-integration.service";
 import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 export interface AdminRefundListItem {
@@ -270,34 +271,7 @@ export class AdminReadRepository {
   }
 
   getIntegrationStatus(): AdminIntegrationStatus {
-    const lastEvent = this.db.prepare(`
-      SELECT source, status, created_at FROM integration_events
-      WHERE tenant_id = ?
-      ORDER BY created_at DESC
-      LIMIT 1
-    `).get(this.tenantId) as { source: string; status: string; created_at: string } | undefined;
-
-    const commerceUrl = process.env.ECOMMERCE_BASE_URL?.trim().replace(/\/$/, "") || null;
-    const commerceSecret = (process.env.BUSINESS_INTEGRATION_SECRET?.trim().length ?? 0) >= 32;
-    const emailKey = Boolean(process.env.RESEND_API_KEY?.trim());
-
-    return {
-      commerce: {
-        configured: Boolean(commerceUrl && commerceSecret),
-        host: commerceHost(commerceUrl),
-        lastEventAt: lastEvent?.created_at ?? null,
-        lastEventStatus: lastEvent?.status ?? null,
-        lastEventSource: lastEvent?.source ?? null,
-      },
-      email: {
-        configured: emailKey,
-        deliveryMode: process.env.NOTIFICATION_DELIVERY_MODE?.trim() || "worker",
-      },
-      webhooks: {
-        configured: false,
-        note: "Per-tenant outbound webhooks ship in the next production step.",
-      },
-    };
+    return getPublicIntegrationStatus(this.db, this.tenantId);
   }
 }
 
@@ -342,23 +316,7 @@ export interface AdminAnalyticsSnapshot {
   automationRate: number;
 }
 
-export interface AdminIntegrationStatus {
-  commerce: {
-    configured: boolean;
-    host: string | null;
-    lastEventAt: string | null;
-    lastEventStatus: string | null;
-    lastEventSource: string | null;
-  };
-  email: {
-    configured: boolean;
-    deliveryMode: string;
-  };
-  webhooks: {
-    configured: boolean;
-    note: string;
-  };
-}
+export type AdminIntegrationStatus = PublicIntegrationStatus;
 
 interface DecisionRow {
   run_id: string;
@@ -379,15 +337,6 @@ interface DecisionRow {
   approval_policy_version: string | null;
   escalation_id: string | null;
   escalation_status: "OPEN" | "RESOLVED" | null;
-}
-
-function commerceHost(url: string | null): string | null {
-  if (!url) return null;
-  try {
-    return new URL(url).host;
-  } catch {
-    return null;
-  }
 }
 
 function deriveDecisionOutcome(

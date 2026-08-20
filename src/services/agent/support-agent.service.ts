@@ -8,6 +8,7 @@ import { executeWithRetry, OperationTimeoutError } from "@/services/agent/retry"
 import { createRefundToolRegistry, type CreateRefundToolRegistryOptions } from "@/tools/agent/refund-tool-registry";
 import type { ToolExecutionResult } from "@/tools/agent/types";
 import { AgentToolError, ToolArgumentError } from "@/tools/agent/validation";
+import { emitOutboundWebhook } from "@/services/integrations/outbound-webhook.service";
 
 export interface SupportAgentOptions extends Pick<CreateRefundToolRegistryOptions, "failOnceTool"> {
   maxTurns?: number;
@@ -403,6 +404,16 @@ export async function runSupportAgent(
     const normalized = error instanceof Error ? error : new Error(String(error));
     const code = error instanceof AgentModelError ? error.code : "AGENT_RUN_FAILED";
     runRepository.fail(runId, code, normalized.message);
+    emitOutboundWebhook(db, {
+      eventType: "agent.failed",
+      eventKey: `agent.failed:${runId}`,
+      payload: {
+        runId,
+        code,
+        customerId: input.customerEmail ?? null,
+        orderId: input.orderId ?? null,
+      },
+    });
     await appendEvent({
       runId,
       type: "RUN_FAILED",

@@ -6,6 +6,7 @@ import { SupportEscalationRepository } from "@/repositories/support-escalation.r
 import { createSqliteCustomerRepository, createSqliteOrderRepository } from "@/repositories/sqlite";
 import { evaluateRefundEligibility } from "@/services/refund-eligibility.service";
 import { executeRefundAtomically } from "@/services/refund-execution.service";
+import { emitOutboundWebhook } from "@/services/integrations/outbound-webhook.service";
 import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 import type { AgentTool } from "@/tools/agent/types";
 import {
@@ -291,7 +292,9 @@ export function createRefundToolRegistry(db: AppDatabase, options: CreateRefundT
         context.runRepository.setContext(context.runId, { customerId, orderId });
         const customer = await customerRepository.findById(customerId);
         const priority = customer?.riskLevel === "HIGH" || reasonCode === "HIGH_RISK" || reasonCode === "TOOL_FAILURE" ? "HIGH" : "NORMAL";
-        return new SupportEscalationRepository(db).createOrGet({
+        const repo = new SupportEscalationRepository(db);
+        const existed = repo.findByRunId(context.runId);
+        const escalation = repo.createOrGet({
           runId: context.runId,
           customerId,
           orderId,
@@ -299,6 +302,20 @@ export function createRefundToolRegistry(db: AppDatabase, options: CreateRefundT
           summary,
           priority,
         });
+        if (!existed) {
+          emitOutboundWebhook(db, {
+            eventType: "case.escalated",
+            eventKey: `case.escalated:${escalation.id}`,
+            payload: {
+              escalationId: escalation.id,
+              customerId,
+              orderId,
+              reasonCode,
+              priority,
+            },
+          });
+        }
+        return escalation;
       },
     },
   ];

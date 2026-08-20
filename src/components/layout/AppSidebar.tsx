@@ -65,7 +65,7 @@ const NAV_SECTIONS: Array<{ label: string; items: NavItem[] }> = [
   },
   {
     label: "Integrations",
-    items: [{ href: "/admin/integrations", label: "Commerce & email", icon: <Plug size={16} />, permission: "integrations:manage" }],
+    items: [{ href: "/admin/integrations", label: "Integrations", icon: <Plug size={16} />, permission: "integrations:manage" }],
   },
   {
     label: "Analytics",

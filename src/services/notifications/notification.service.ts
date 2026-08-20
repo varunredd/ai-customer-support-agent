@@ -1,6 +1,7 @@
 import type { AppDatabase } from "@/db/database";
 import { operationalLog } from "@/lib/observability/system-logger";
 import { NotificationOutboxRepository, type NotificationRecord } from "@/repositories/notification-outbox.repository";
+import { resolveEmailCredentials } from "@/services/integrations/tenant-integration.service";
 
 export interface NotificationSender {
   send(notification: NotificationRecord): Promise<{ providerMessageId: string }>;
@@ -16,9 +17,12 @@ function htmlEscape(value: unknown) {
 }
 
 export class ResendNotificationSender implements NotificationSender {
+  constructor(private readonly db: AppDatabase) {}
+
   async send(notification: NotificationRecord): Promise<{ providerMessageId: string }> {
-    const apiKey = process.env.RESEND_API_KEY?.trim();
-    const from = process.env.RESEND_FROM_EMAIL?.trim();
+    const email = resolveEmailCredentials(this.db);
+    const apiKey = email.apiKey;
+    const from = email.fromEmail;
     if (!apiKey || !from) throw new Error("RESEND_NOT_CONFIGURED");
 
     const payload = notification.payload;
@@ -59,7 +63,7 @@ export async function drainNotificationOutbox(
   options: { limit?: number; sender?: NotificationSender } = {},
 ) {
   const repository = new NotificationOutboxRepository(db);
-  const sender = options.sender ?? new ResendNotificationSender();
+  const sender = options.sender ?? new ResendNotificationSender(db);
   const pending = repository.listDispatchable(new Date().toISOString(), options.limit ?? 25);
   let sent = 0;
   let failed = 0;

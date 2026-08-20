@@ -1,4 +1,7 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { getDatabase } from "@/db/database";
+import { signIntegrationPayload } from "@/security/integration-signature";
+import { resolveCommerceCredentials } from "@/services/integrations/tenant-integration.service";
 
 interface RefundNotifyInput {
   refundId: string;
@@ -9,12 +12,13 @@ interface RefundNotifyInput {
   amountCents: number;
   reason: string;
   condition: string;
+  tenantId?: string;
 }
 
 export async function notifyEcommerceRefundCompleted(input: RefundNotifyInput) {
-  const baseUrl = process.env.ECOMMERCE_BASE_URL?.trim().replace(/\/$/, "");
-  const secret = process.env.BUSINESS_INTEGRATION_SECRET?.trim();
-  if (!baseUrl || !secret || secret.length < 32) {
+  const db = getDatabase();
+  const commerce = resolveCommerceCredentials(db, input.tenantId);
+  if (!commerce.configured || !commerce.baseUrl || !commerce.secret) {
     return { notified: false as const, reason: "E-commerce integration is not configured." };
   }
 
@@ -31,12 +35,15 @@ export async function notifyEcommerceRefundCompleted(input: RefundNotifyInput) {
   });
   const timestamp = String(Date.now());
   const eventId = `refund_${randomUUID()}`;
-  const signature = createHmac("sha256", secret)
-    .update(`${timestamp}.${eventId}.${rawBody}`)
-    .digest("hex");
+  const signature = signIntegrationPayload({
+    secret: commerce.secret,
+    timestamp,
+    eventId,
+    rawBody,
+  });
 
   try {
-    const response = await fetch(`${baseUrl}/api/integrations/jobform/refund-completed`, {
+    const response = await fetch(`${commerce.baseUrl}/api/integrations/jobform/refund-completed`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
