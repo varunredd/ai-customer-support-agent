@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, Bot, FileText, LayoutDashboard, LogOut, MessageSquare, Receipt, ServerCog, UserRoundCheck, Users } from "lucide-react";
+import { Activity, Bot, FileText, LayoutDashboard, LogOut, MessageSquare, Receipt, ServerCog, Shield, UserRoundCheck, Users } from "lucide-react";
 import clsx from "clsx";
+import { formatStaffRole } from "@/lib/format";
+import type { StaffRole } from "@/domain/auth/types";
+import type { StaffPermission } from "@/security/rbac";
 import styles from "./AppSidebar.module.css";
 
 const PUBLIC_PATHS = ["/", "/support", "/login", "/privacy", "/terms"];
@@ -13,6 +16,8 @@ export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
+  const [role, setRole] = useState<StaffRole | null>(null);
+  const [permissions, setPermissions] = useState<StaffPermission[]>([]);
 
   const publicSurface = PUBLIC_PATHS.some((path) => pathname === path || (path !== "/" && pathname.startsWith(`${path}/`)));
 
@@ -21,8 +26,13 @@ export function AppSidebar() {
     let active = true;
     void fetch("/api/admin/login", { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
-      .then((payload: { email?: unknown } | null) => {
-        if (active && typeof payload?.email === "string") setEmail(payload.email);
+      .then((payload: { email?: unknown; role?: unknown; permissions?: unknown } | null) => {
+        if (!active || !payload) return;
+        if (typeof payload.email === "string") setEmail(payload.email);
+        if (typeof payload.role === "string") setRole(payload.role as StaffRole);
+        if (Array.isArray(payload.permissions)) {
+          setPermissions(payload.permissions.filter((entry): entry is StaffPermission => typeof entry === "string"));
+        }
       })
       .catch(() => undefined);
     return () => {
@@ -91,6 +101,12 @@ export function AppSidebar() {
             <ServerCog size={16} />
             System
           </Link>
+          {permissions.includes("team:manage") ? (
+            <Link href="/admin/team" className={clsx(styles.navItem, pathname.startsWith("/admin/team") && styles.navItemActive)}>
+              <Shield size={16} />
+              Team
+            </Link>
+          ) : null}
         </div>
       </nav>
 
@@ -99,7 +115,7 @@ export function AppSidebar() {
           <div className={styles.avatar}>{(email ?? "ST").slice(0, 2).toUpperCase()}</div>
           <div className={styles.userInfo}>
             <span className={styles.userName}>{email ?? "Staff"}</span>
-            <span className={styles.userRole}>Operations</span>
+            <span className={styles.userRole}>{role ? formatStaffRole(role) : "Operations"}</span>
           </div>
         </div>
         <button type="button" className={styles.navItem} onClick={() => void signOut()}>

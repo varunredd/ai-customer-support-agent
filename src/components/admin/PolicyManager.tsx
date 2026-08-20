@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ChevronDown } from "lucide-react";
 import {
@@ -67,6 +67,21 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [canEditPolicy, setCanEditPolicy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/admin/login", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { permissions?: unknown } | null) => {
+        if (!active || !payload || !Array.isArray(payload.permissions)) return;
+        setCanEditPolicy(payload.permissions.includes("policy:edit"));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const enabledCount = rules.filter((rule) => rule.enabled).length;
 
@@ -158,6 +173,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
             <input
               type="checkbox"
               checked={rule.enabled}
+              disabled={!canEditPolicy}
               onChange={(event) => updateRule(index, { enabled: event.target.checked })}
             />
           </label>
@@ -172,8 +188,8 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
         {isOpen ? (
           <div className={styles.ruleBody}>
             <p className={styles.ruleCode}><code>{rule.code}</code></p>
-            <input className={styles.input} value={rule.title} onChange={(event) => updateRule(index, { title: event.target.value })} />
-            <textarea className={styles.textarea} value={rule.text} onChange={(event) => updateRule(index, { text: event.target.value })} rows={2} />
+            <input className={styles.input} value={rule.title} disabled={!canEditPolicy} onChange={(event) => updateRule(index, { title: event.target.value })} />
+            <textarea className={styles.textarea} value={rule.text} disabled={!canEditPolicy} onChange={(event) => updateRule(index, { text: event.target.value })} rows={2} />
             {rule.code === "CONDITION_ALLOWED" ? (
               <div className={styles.matrix}>
                 <table className="table">
@@ -192,7 +208,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
                           const checked = allowed.includes(condition);
                           return (
                             <td key={condition}>
-                              <input type="checkbox" checked={checked} onChange={() => toggleCondition(reason, condition, index)} />
+                              <input type="checkbox" checked={checked} disabled={!canEditPolicy} onChange={() => toggleCondition(reason, condition, index)} />
                             </td>
                           );
                         })}
@@ -229,7 +245,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
         <section className={styles.main}>
           <div className={styles.emptyState}>
             <p className={styles.emptyText}>Set which refund checks NovaShop enforces. The support agent follows these rules exactly — it cannot approve refunds you disable here.</p>
-            <button type="button" className={styles.button} disabled={busy} onClick={() => void createPolicy()}>
+            <button type="button" className={styles.button} disabled={busy || !canEditPolicy} onClick={() => void createPolicy()}>
               Create refund policy
             </button>
           </div>
@@ -249,7 +265,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
             <strong>{enabledCount}</strong>/{POLICY_CATALOG.length} enabled · {refundWindow}d window
           </p>
         </div>
-        <button type="button" className={styles.button} disabled={busy} onClick={() => void savePolicy()}>
+        <button type="button" className={styles.button} disabled={busy || !canEditPolicy} onClick={() => void savePolicy()}>
           Save policy
         </button>
       </div>
@@ -258,7 +274,7 @@ export function PolicyManager({ initialPolicy }: PolicyManagerProps) {
         <div className={styles.settingsRow}>
           <label className={styles.fieldLabel}>
             Return window (days)
-            <input className={styles.input} type="number" min={1} max={365} value={refundWindow} onChange={(event) => setRefundWindow(Number(event.target.value))} />
+            <input className={styles.input} type="number" min={1} max={365} value={refundWindow} disabled={!canEditPolicy} onChange={(event) => setRefundWindow(Number(event.target.value))} />
           </label>
         </div>
 

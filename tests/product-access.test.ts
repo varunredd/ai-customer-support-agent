@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createDatabase } from "@/db/database";
+import { closeDatabaseForTests, createDatabase } from "@/db/database";
 import { seedCatalog } from "@/db/seed";
 import {
   createAdminSessionToken,
   staffCredentialsConfigured,
   verifyAdminSessionToken,
-  verifyStaffCredentials,
 } from "@/security/admin-session";
 import {
   assertSupportSessionAccess,
@@ -14,6 +13,7 @@ import {
   portalEntryEnabled,
   SupportAccessError,
 } from "@/security/support-access";
+import { authenticateStaffUser } from "@/services/auth/staff-auth.service";
 import { createPortalSupportSession, createSupportSession } from "@/services/support/support-session.service";
 
 test("support entry defaults to portal and host together", () => {
@@ -99,13 +99,21 @@ test("staff credentials mint a verifiable admin session", () => {
   process.env.ADMIN_EMAIL = "ops@jobform.example";
   process.env.ADMIN_PASSWORD = "launch-ready-pass";
   process.env.ADMIN_SESSION_SECRET = "admin-session-secret-for-product-tests-123456";
+  const db = createDatabase(":memory:");
   try {
     assert.equal(staffCredentialsConfigured(), true);
-    const email = verifyStaffCredentials("ops@jobform.example", "launch-ready-pass");
-    const token = createAdminSessionToken(email);
+    const user = authenticateStaffUser(db, "ops@jobform.example", "launch-ready-pass");
+    const token = createAdminSessionToken({
+      userId: user.id,
+      email: user.email,
+      tenantId: user.tenantId,
+      role: user.role,
+    });
     assert.equal(verifyAdminSessionToken(token)?.email, "ops@jobform.example");
     assert.equal(verifyAdminSessionToken("not-a-token"), null);
   } finally {
+    db.close();
+    closeDatabaseForTests();
     if (previous.email === undefined) delete process.env.ADMIN_EMAIL;
     else process.env.ADMIN_EMAIL = previous.email;
     if (previous.password === undefined) delete process.env.ADMIN_PASSWORD;

@@ -7,8 +7,9 @@ import {
   clearAdminSessionCookie,
   createAdminSessionToken,
   readAdminSession,
-  verifyStaffCredentials,
 } from "@/security/admin-session";
+import { staffSessionPayload } from "@/security/staff-authorization";
+import { authenticateStaffUser } from "@/services/auth/staff-auth.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const session = readAdminSession(request);
   if (!session) return jsonError(401, "ADMIN_ACCESS_DENIED", "Staff sign-in is required.");
-  return Response.json({ email: session.email }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json(staffSessionPayload(session), { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -30,9 +31,20 @@ export async function POST(request: Request) {
     const body = asObject(await request.json());
     const email = readNonEmptyString(body, "email", 320);
     const password = readNonEmptyString(body, "password", 256);
-    const verifiedEmail = verifyStaffCredentials(email, password);
-    const token = createAdminSessionToken(verifiedEmail);
-    return Response.json({ email: verifiedEmail }, {
+    const staffUser = authenticateStaffUser(db, email, password);
+    const token = createAdminSessionToken({
+      userId: staffUser.id,
+      email: staffUser.email,
+      tenantId: staffUser.tenantId,
+      role: staffUser.role,
+    });
+    return Response.json(staffSessionPayload({
+      userId: staffUser.id,
+      email: staffUser.email,
+      tenantId: staffUser.tenantId,
+      role: staffUser.role,
+      exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
+    }), {
       status: 200,
       headers: {
         "Cache-Control": "no-store",

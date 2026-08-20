@@ -6,6 +6,7 @@ import { purgeLegacySampleCatalog } from "@/db/clear-business-data";
 import { seedCatalog } from "@/db/seed";
 import { ensureEcommerceSyncSchedulerStarted } from "@/services/integrations/ecommerce-sync-scheduler";
 import { ensureDefaultTenant, resetTenantContextCache } from "@/services/tenant/tenant-context.service";
+import { ensureBootstrapStaffUser } from "@/services/auth/staff-bootstrap.service";
 
 export type AppDatabase = Database.Database;
 
@@ -22,6 +23,7 @@ export function createDatabase(filename: string): AppDatabase {
   db.pragma("busy_timeout = 5000");
   migrateDatabase(db);
   ensureDefaultTenant(db);
+  ensureBootstrapStaffUser(db);
   return db;
 }
 

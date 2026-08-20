@@ -1,6 +1,6 @@
 import { getDatabase } from "@/db/database";
 import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
-import { hasStaffApiAccess } from "@/security/admin-control";
+import { requireStaffAuth, requireStaffPermission } from "@/security/staff-authorization";
 import { catalogRuleTemplates, mergePolicyRulesWithCatalog, policyRulesNeedCatalogBackfill } from "@/domain/refunds/policy";
 import type { RefundPolicyRule } from "@/domain/refunds/policy";
 
@@ -20,7 +20,9 @@ function backfillPolicyRules(repository: RefundPolicyRepository) {
   return repository.updateActive({ rules: mergePolicyRulesWithCatalog(active.rules) });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = requireStaffAuth(request);
+  if (auth instanceof Response) return auth;
   const repository = new RefundPolicyRepository(getDatabase());
   repository.activatePendingDraft();
   const active = backfillPolicyRules(repository);
@@ -28,9 +30,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!hasStaffApiAccess(request)) {
-    return Response.json({ error: { code: "UNAUTHORIZED", message: "Staff authorization is required." } }, { status: 401 });
-  }
+  const auth = requireStaffPermission(request, "policy:edit");
+  if (auth instanceof Response) return auth;
   try {
     const body = await request.json() as Record<string, unknown>;
     const refundWindowDays = typeof body.refundWindowDays === "number" ? body.refundWindowDays : 30;

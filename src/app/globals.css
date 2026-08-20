@@ -193,12 +193,14 @@ a {
   backdrop-filter: blur(16px);
 }
 
-.search-field input {
+.search-field input,
+.search-field select {
   width: 100%;
   border: none;
   outline: none;
   background: transparent;
   color: var(--text);
+  font: inherit;
 }
 
 .search-field:focus-within {

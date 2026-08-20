@@ -1,6 +1,6 @@
 import { getDatabase } from "@/db/database";
 import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
-import { hasStaffApiAccess } from "@/security/admin-control";
+import { requireStaffPermission } from "@/security/staff-authorization";
 import type { RefundPolicyRule } from "@/domain/refunds/policy";
 
 export const runtime = "nodejs";
@@ -13,9 +13,8 @@ function parseRules(body: Record<string, unknown>): RefundPolicyRule[] | undefin
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ policyId: string }> }) {
-  if (!hasStaffApiAccess(request)) {
-    return Response.json({ error: { code: "UNAUTHORIZED", message: "Staff authorization is required." } }, { status: 401 });
-  }
+  const auth = requireStaffPermission(request, "policy:edit");
+  if (auth instanceof Response) return auth;
   try {
     const { policyId } = await context.params;
     const body = await request.json() as Record<string, unknown>;
@@ -39,10 +38,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ polic
   }
 }
 
-export async function DELETE(_request: Request, context: { params: Promise<{ policyId: string }> }) {
-  if (!hasStaffApiAccess(_request)) {
-    return Response.json({ error: { code: "UNAUTHORIZED", message: "Staff authorization is required." } }, { status: 401 });
-  }
+export async function DELETE(request: Request, context: { params: Promise<{ policyId: string }> }) {
+  const auth = requireStaffPermission(request, "policy:edit");
+  if (auth instanceof Response) return auth;
   try {
     const { policyId } = await context.params;
     new RefundPolicyRepository(getDatabase()).deletePolicy(policyId);

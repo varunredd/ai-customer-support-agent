@@ -51,6 +51,7 @@ export default function SupportPage() {
   const bootstrapped = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const spokenMessageIdsRef = useRef<Set<string>>(new Set());
   const [detail, setDetail] = useState<SupportSessionDetail | null>(null);
   const [entry, setEntry] = useState<SupportEntryState | null>(null);
   const [sessionAccessToken, setSessionAccessToken] = useState<string | null>(null);
@@ -84,19 +85,30 @@ export default function SupportPage() {
 
   useEffect(() => stopPlayback, [stopPlayback]);
 
-  const playAgentMessage = useCallback(async (message: SupportMessage) => {
-    if (message.role !== "AGENT") return;
+  const playAgentMessage = useCallback(async (
+    message: SupportMessage,
+    options?: { accessToken?: string; manual?: boolean },
+  ) => {
+    if (message.role !== "AGENT" || message.id.startsWith("local_")) return;
+
+    const autoPlayEnabled = process.env.NEXT_PUBLIC_VOICE_AUTO_PLAY !== "false";
+    if (!options?.manual && !autoPlayEnabled) return;
+    if (!options?.manual && spokenMessageIdsRef.current.has(message.id)) return;
+
     stopPlayback();
     setVoicePlaybackError(null);
     setSpeakingMessageId(message.id);
     setVoicePhase("generating");
+    spokenMessageIdsRef.current.add(message.id);
+
+    const token = options?.accessToken ?? sessionAccessToken;
 
     try {
       const response = await fetch("/api/voice/speech", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(sessionAccessToken ? { Authorization: `Bearer ${sessionAccessToken}` } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ sessionId: message.sessionId, messageId: message.id }),
       });
@@ -119,6 +131,7 @@ export default function SupportPage() {
       const url = await attachSpeechAudio(response, audio);
       audioUrlRef.current = url;
     } catch (caught) {
+      spokenMessageIdsRef.current.delete(message.id);
       stopPlayback();
       const messageText = caught instanceof Error ? caught.message : "Voice playback is temporarily unavailable.";
       if (messageText.toLowerCase().includes("play()") || messageText.toLowerCase().includes("autoplay")) {
@@ -153,6 +166,9 @@ export default function SupportPage() {
       setSessionAccessToken(accessToken);
       setDetail(sessionDetail);
       setMessages(sessionDetail.messages);
+      spokenMessageIdsRef.current.clear();
+      const welcome = sessionDetail.messages.find((message) => message.role === "AGENT");
+      if (welcome) void playAgentMessage(welcome, { accessToken });
       return sessionDetail;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to initialize support chat.");
@@ -160,7 +176,7 @@ export default function SupportPage() {
     } finally {
       setIsStarting(false);
     }
-  }, []);
+  }, [playAgentMessage]);
 
   useEffect(() => {
     if (bootstrapped.current) return;
@@ -199,7 +215,7 @@ export default function SupportPage() {
     setMessages(refreshed.messages);
   };
 
-  const handleSend = async (content: string, options?: { speakResponse?: boolean }) => {
+  const handleSend = async (content: string) => {
     if (!detail || isSending) return;
     stopPlayback();
     setVoicePlaybackError(null);
@@ -250,9 +266,7 @@ export default function SupportPage() {
         if (event === "assistant_message" && data && typeof data === "object" && !Array.isArray(data)) {
           const assistantMessage = data as SupportMessage;
           setMessages((previous) => [...previous, assistantMessage]);
-          if (options?.speakResponse) {
-            void playAgentMessage(assistantMessage);
-          }
+          void playAgentMessage(assistantMessage);
         }
         if (event === "error" && data && typeof data === "object" && !Array.isArray(data)) {
           const message = (data as { message?: unknown }).message;
@@ -276,13 +290,14 @@ export default function SupportPage() {
     accessToken: sessionAccessToken,
     disabled: isSending || !detail,
     onFinalTranscript: async (transcript) => {
-      await handleSend(transcript, { speakResponse: true });
+      await handleSend(transcript);
     },
   });
 
   const handleNewSession = () => {
     voice.stop();
     stopPlayback();
+    spokenMessageIdsRef.current.clear();
     setDetail(null);
     setSessionAccessToken(null);
     setMessages([]);
@@ -346,7 +361,7 @@ export default function SupportPage() {
                   role={message.role === "AGENT" ? "agent" : "customer"}
                   content={message.content}
                   timestamp={formatMessageTime(message.createdAt)}
-                  onSpeak={message.role === "AGENT" && !message.id.startsWith("local_") ? () => void playAgentMessage(message) : undefined}
+                  onSpeak={message.role === "AGENT" && !message.id.startsWith("local_") ? () => void playAgentMessage(message, { manual: true }) : undefined}
                   speaking={speakingMessageId === message.id}
                   voicePhase={speakingMessageId === message.id ? voicePhase : "idle"}
                 />
@@ -387,7 +402,7 @@ export default function SupportPage() {
               />
               {voicePlaybackError ? <p className={styles.voicePlaybackError} role="status">{voicePlaybackError}</p> : null}
               <p className={styles.hint}>
-                Voice responses are AI-generated. Microphone turns are transcribed, then sent through the same refund agent and policy as typed messages.
+                Agent replies play automatically. Microphone turns are transcribed, then sent through the same refund agent and policy as typed messages.
               </p>
             </div>
           </div>

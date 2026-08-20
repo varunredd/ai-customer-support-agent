@@ -422,6 +422,32 @@ export const MIGRATIONS: DatabaseMigration[] = [
         ON notification_outbox(status, next_attempt_at, created_at);
     `,
   },
+
+  {
+    version: 5,
+    name: "phase7_staff_users_rbac",
+    sql: `
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id),
+        email TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN (
+          'PLATFORM_ADMIN',
+          'MERCHANT_ADMIN',
+          'SUPPORT_MANAGER',
+          'SUPPORT_AGENT',
+          'VIEWER'
+        )),
+        status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'DISABLED')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(tenant_id, email COLLATE NOCASE)
+      );
+
+      CREATE INDEX idx_users_tenant_id ON users(tenant_id);
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.at(-1)?.version ?? 0;

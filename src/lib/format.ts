@@ -38,3 +38,15 @@ export function avatarColor(seed: string): string {
   }
   return AVATAR_COLORS[hash];
 }
+
+const STAFF_ROLE_LABELS: Record<string, string> = {
+  PLATFORM_ADMIN: "Platform admin",
+  MERCHANT_ADMIN: "Merchant admin",
+  SUPPORT_MANAGER: "Support manager",
+  SUPPORT_AGENT: "Support agent",
+  VIEWER: "Viewer",
+};
+
+export function formatStaffRole(role: string): string {
+  return STAFF_ROLE_LABELS[role] ?? role.replaceAll("_", " ").toLowerCase();
+}

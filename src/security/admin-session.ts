@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import type { StaffRole, StaffSession } from "@/domain/auth/types";
 
 export const ADMIN_COOKIE = "jobform_admin";
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -33,6 +34,7 @@ export function staffCredentialsConfigured() {
   return email.includes("@") && password.length >= 12;
 }
 
+/** @deprecated Env-only verification; prefer authenticateStaffUser with the users table. */
 export function verifyStaffCredentials(email: string, password: string) {
   const expectedEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase() ?? "";
   const expectedPassword = process.env.ADMIN_PASSWORD ?? "";
@@ -51,26 +53,45 @@ function sign(payload: string) {
   return createHmac("sha256", secret()).update(payload).digest("base64url");
 }
 
-export function createAdminSessionToken(email: string, nowSeconds = Math.floor(Date.now() / 1000)) {
+export function createAdminSessionToken(
+  session: Pick<StaffSession, "userId" | "email" | "tenantId" | "role">,
+  nowSeconds = Math.floor(Date.now() / 1000),
+) {
   const payload = Buffer.from(JSON.stringify({
-    email: email.trim().toLowerCase(),
+    sub: session.userId,
+    email: session.email.trim().toLowerCase(),
+    tenantId: session.tenantId,
+    role: session.role,
     exp: nowSeconds + SESSION_TTL_SECONDS,
   })).toString("base64url");
   return `${payload}.${sign(payload)}`;
 }
 
-export function verifyAdminSessionToken(token: string, nowSeconds = Math.floor(Date.now() / 1000)) {
+export function verifyAdminSessionToken(token: string, nowSeconds = Math.floor(Date.now() / 1000)): StaffSession | null {
   const [payload, signature, extra] = token.split(".");
   if (!payload || !signature || extra) return null;
   const expected = sign(payload);
   if (!constantEqual(Buffer.from(signature), Buffer.from(expected))) return null;
   try {
-    const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { email?: unknown; exp?: unknown };
+    const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      sub?: unknown;
+      email?: unknown;
+      tenantId?: unknown;
+      role?: unknown;
+      exp?: unknown;
+    };
+    if (typeof claims.sub !== "string" || !claims.sub.startsWith("usr_")) return null;
     if (typeof claims.email !== "string" || !claims.email.includes("@")) return null;
+    if (typeof claims.tenantId !== "string" || !claims.tenantId.startsWith("ten_")) return null;
+    if (typeof claims.role !== "string") return null;
     if (typeof claims.exp !== "number" || claims.exp <= nowSeconds) return null;
-    const expectedEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase() ?? "";
-    if (expectedEmail && claims.email.trim().toLowerCase() !== expectedEmail) return null;
-    return { email: claims.email.trim().toLowerCase(), exp: claims.exp };
+    return {
+      userId: claims.sub,
+      email: claims.email.trim().toLowerCase(),
+      tenantId: claims.tenantId,
+      role: claims.role as StaffRole,
+      exp: claims.exp,
+    };
   } catch {
     return null;
   }
@@ -85,7 +106,7 @@ export function readCookie(request: Request, name: string) {
   return "";
 }
 
-export function readAdminSession(request: Request) {
+export function readAdminSession(request: Request): StaffSession | null {
   const token = readCookie(request, ADMIN_COOKIE);
   if (!token) return null;
   try {
