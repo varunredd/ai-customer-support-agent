@@ -7,35 +7,24 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, context: { params: Promise<{ policyId: string }> }) {
-  const auth = requireStaffPermission(request, "policy:publish");
+  const auth = requireStaffPermission(request, "policy:edit");
   if (auth instanceof Response) return auth;
   try {
     const { policyId } = await context.params;
     const repository = new RefundPolicyRepository(getDatabase());
     const current = repository.findById(policyId);
-    if (!current) throw new Error("Refund policy was not found.");
-    if (current.status === "ARCHIVED") throw new Error("Archived policies cannot be published.");
-    const validation = validatePersistedPolicy(current);
-    if (!validation.ok) {
+    if (!current) {
       return Response.json({
-        error: {
-          code: "POLICY_VALIDATION_FAILED",
-          message: validation.errors.join(" "),
-          validation,
-        },
-      }, { status: 400 });
+        error: { code: "POLICY_NOT_FOUND", message: "Refund policy was not found." },
+      }, { status: 404 });
     }
-    const policy = repository.publish(policyId);
-    return Response.json({
-      policy,
-      policies: repository.list(),
-      validation,
-    }, { headers: { "Cache-Control": "no-store" } });
+    const validation = validatePersistedPolicy(current);
+    return Response.json({ validation, policy: current }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return Response.json({
       error: {
-        code: "POLICY_PUBLISH_FAILED",
-        message: error instanceof Error ? error.message : "Unable to publish policy.",
+        code: "POLICY_VALIDATE_FAILED",
+        message: error instanceof Error ? error.message : "Unable to validate policy.",
       },
     }, { status: 400 });
   }

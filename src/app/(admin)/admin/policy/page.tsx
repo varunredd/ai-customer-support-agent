@@ -8,17 +8,19 @@ export const dynamic = "force-dynamic";
 
 export default function PolicyPage() {
   const repository = new RefundPolicyRepository(getDatabase());
-  repository.activatePendingDraft();
-  let policy = repository.getActiveOrNull();
-  if (policy && policyRulesNeedCatalogBackfill(policy.rules)) {
-    policy = repository.updateActive({ rules: mergePolicyRulesWithCatalog(policy.rules) });
-  }
+  const policies = repository.list().map((policy) => {
+    if (policy.status === "ACTIVE" && policyRulesNeedCatalogBackfill(policy.rules)) {
+      return { ...policy, rules: mergePolicyRulesWithCatalog(policy.rules) };
+    }
+    return policy;
+  });
+  const policy = policies.find((entry) => entry.status === "ACTIVE") ?? null;
 
   return (
     <div className="admin-page">
       <div className="admin-stack admin-stack-wide">
         <PageHeader title="Refund Policy" />
-        <PolicyManager initialPolicy={policy} />
+        <PolicyManager initialPolicy={policy} initialPolicies={policies} />
       </div>
     </div>
   );
