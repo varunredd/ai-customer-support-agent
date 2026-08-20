@@ -37,15 +37,22 @@ export function migrateDatabase(db: AppDatabase) {
   for (const migration of MIGRATIONS) {
     if (applied.has(migration.version)) continue;
 
-    const applyMigration = db.transaction(() => {
-      db.exec(migration.sql);
-      db.prepare("INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)").run(
-        migration.version,
-        migration.name,
-        new Date().toISOString(),
-      );
-    });
-    applyMigration.immediate();
+    // SQLite ignores PRAGMA foreign_keys inside a transaction. Disable outside so
+    // table rebuilds (DROP + rename) in later migrations can succeed.
+    db.pragma("foreign_keys = OFF");
+    try {
+      const applyMigration = db.transaction(() => {
+        db.exec(migration.sql);
+        db.prepare("INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)").run(
+          migration.version,
+          migration.name,
+          new Date().toISOString(),
+        );
+      });
+      applyMigration.immediate();
+    } finally {
+      db.pragma("foreign_keys = ON");
+    }
   }
 }
 
