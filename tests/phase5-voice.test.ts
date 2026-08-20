@@ -97,6 +97,10 @@ test("voice playback accepts only persisted agent messages bound to the same sup
 });
 
 test("TTS request synthesizes persisted response text with a server-only key", async () => {
+  const previousModel = process.env.OPENAI_TTS_MODEL;
+  const previousVoice = process.env.OPENAI_TTS_VOICE;
+  delete process.env.OPENAI_TTS_MODEL;
+  delete process.env.OPENAI_TTS_VOICE;
   let authorization = "";
   let body: Record<string, unknown> = {};
   const mockFetch: typeof fetch = async (input, init) => {
@@ -108,16 +112,24 @@ test("TTS request synthesizes persisted response text with a server-only key", a
     });
   };
 
-  const client = new OpenAIVoiceClient(mockFetch, "server_voice_key");
-  const result = await client.synthesizeSpeech("Your refund is not eligible under the active policy.");
+  try {
+    const client = new OpenAIVoiceClient(mockFetch, "server_voice_key");
+    const result = await client.synthesizeSpeech("Your refund is not eligible under the active policy.");
 
-  assert.equal(authorization, "Bearer server_voice_key");
-  assert.equal(body.model, "gpt-4o-mini-tts");
-  assert.equal(body.voice, "marin");
-  assert.equal(body.response_format, "mp3");
-  assert.equal(body.input, "Your refund is not eligible under the active policy.");
-  assert.equal(result.contentType, "audio/mpeg");
-  assert.ok(result.body);
+    assert.equal(authorization, "Bearer server_voice_key");
+    assert.equal(body.model, "tts-1");
+    assert.equal(body.voice, "nova");
+    assert.equal(body.response_format, "mp3");
+    assert.equal(body.input, "Your refund is not eligible under the active policy.");
+    assert.equal(body.instructions, undefined);
+    assert.equal(result.contentType, "audio/mpeg");
+    assert.ok(result.body);
+  } finally {
+    if (previousModel === undefined) delete process.env.OPENAI_TTS_MODEL;
+    else process.env.OPENAI_TTS_MODEL = previousModel;
+    if (previousVoice === undefined) delete process.env.OPENAI_TTS_VOICE;
+    else process.env.OPENAI_TTS_VOICE = previousVoice;
+  }
 });
 
 test("Realtime transcription event parser preserves deltas and final transcript", () => {

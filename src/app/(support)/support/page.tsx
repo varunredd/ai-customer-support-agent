@@ -15,6 +15,7 @@ import { HostedSupportPanel } from "@/components/chat/HostedSupportPanel";
 import { SupportPortalGate } from "@/components/chat/SupportPortalGate";
 import { SupportPortalPanel } from "@/components/chat/SupportPortalPanel";
 import { useRealtimeTranscription } from "@/hooks/useRealtimeTranscription";
+import { attachSpeechAudio } from "@/lib/play-speech-audio";
 import { readSseResponse } from "@/lib/sse-client";
 import { supportOutcomeFromEvent, type SupportOutcome } from "@/lib/support-outcome";
 import styles from "./page.module.css";
@@ -61,6 +62,7 @@ export default function SupportPage() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [voicePhase, setVoicePhase] = useState<"idle" | "generating" | "playing">("idle");
   const [voicePlaybackError, setVoicePlaybackError] = useState<string | null>(null);
 
   const stopPlayback = useCallback(() => {
@@ -77,6 +79,7 @@ export default function SupportPage() {
     }
     if (audio) audio.removeAttribute("src");
     setSpeakingMessageId(null);
+    setVoicePhase("idle");
   }, []);
 
   useEffect(() => stopPlayback, [stopPlayback]);
@@ -86,6 +89,7 @@ export default function SupportPage() {
     stopPlayback();
     setVoicePlaybackError(null);
     setSpeakingMessageId(message.id);
+    setVoicePhase("generating");
 
     try {
       const response = await fetch("/api/voice/speech", {
@@ -100,11 +104,8 @@ export default function SupportPage() {
         throw new Error(await readResponseError(response, "Voice playback is temporarily unavailable."));
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
+      const audio = new Audio();
       audioRef.current = audio;
-      audioUrlRef.current = url;
       audio.onended = () => stopPlayback();
       audio.onerror = () => {
         if (!audioRef.current || audio.ended || audio.currentTime > 0) {
@@ -114,7 +115,9 @@ export default function SupportPage() {
         setVoicePlaybackError("The AI-generated voice could not be played. The text response remains available.");
         stopPlayback();
       };
-      await audio.play();
+      audio.onplaying = () => setVoicePhase("playing");
+      const url = await attachSpeechAudio(response, audio);
+      audioUrlRef.current = url;
     } catch (caught) {
       stopPlayback();
       const messageText = caught instanceof Error ? caught.message : "Voice playback is temporarily unavailable.";
@@ -213,7 +216,6 @@ export default function SupportPage() {
     setError(null);
     setOutcome(null);
     setActivity("Sending request to the support agent…");
-    let assistantMessageForVoice: SupportMessage | null = null;
 
     try {
       const response = await fetch("/api/support/chat", {
@@ -247,8 +249,10 @@ export default function SupportPage() {
         }
         if (event === "assistant_message" && data && typeof data === "object" && !Array.isArray(data)) {
           const assistantMessage = data as SupportMessage;
-          assistantMessageForVoice = assistantMessage;
           setMessages((previous) => [...previous, assistantMessage]);
+          if (options?.speakResponse) {
+            void playAgentMessage(assistantMessage);
+          }
         }
         if (event === "error" && data && typeof data === "object" && !Array.isArray(data)) {
           const message = (data as { message?: unknown }).message;
@@ -258,9 +262,6 @@ export default function SupportPage() {
 
       await refreshSession(detail.session.id);
       setActivity(null);
-      if (options?.speakResponse && assistantMessageForVoice) {
-        await playAgentMessage(assistantMessageForVoice);
-      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The support request failed.");
       setActivity(null);
@@ -347,6 +348,7 @@ export default function SupportPage() {
                   timestamp={formatMessageTime(message.createdAt)}
                   onSpeak={message.role === "AGENT" && !message.id.startsWith("local_") ? () => void playAgentMessage(message) : undefined}
                   speaking={speakingMessageId === message.id}
+                  voicePhase={speakingMessageId === message.id ? voicePhase : "idle"}
                 />
               ))}
               {activity ? <AgentActivityLog activity={activity} /> : null}

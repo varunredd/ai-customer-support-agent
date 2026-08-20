@@ -5,6 +5,8 @@ import { assertSupportSessionAccess, SupportAccessError } from "@/security/suppo
 import { consumeRateLimit, RateLimitExceededError } from "@/security/rate-limit";
 import { SupportSessionNotFoundError } from "@/services/support/support-session.service";
 import {
+  bufferAndCacheSpeech,
+  getCachedSpeech,
   getSpeakableAgentMessage,
   VoiceMessageNotAgentError,
   VoiceMessageNotFoundError,
@@ -28,9 +30,29 @@ export async function POST(request: Request) {
     const db = getDatabase();
     assertSupportSessionAccess(db, sessionId, request);
     consumeRateLimit(db, { key: `voice-speech:${sessionId}`, limit: 30, windowMs: 60_000 });
+    const cached = getCachedSpeech(sessionId, messageId);
+    if (cached) {
+      return new Response(Buffer.from(cached.bytes), {
+        headers: {
+          "Content-Type": cached.contentType,
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+
     const message = await getSpeakableAgentMessage(db, { sessionId, messageId });
     const speech = await new OpenAIVoiceClient().synthesizeSpeech(message.content);
-    return new Response(speech.body, {
+    if (speech.body) {
+      const [forClient, forCache] = speech.body.tee();
+      void bufferAndCacheSpeech(sessionId, messageId, forCache, speech.contentType);
+      return new Response(forClient, {
+        headers: {
+          "Content-Type": speech.contentType,
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+    return new Response(null, {
       headers: {
         "Content-Type": speech.contentType,
         "Cache-Control": "no-store",

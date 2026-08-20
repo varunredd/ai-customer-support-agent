@@ -1,5 +1,58 @@
 # Architecture
 
+Jobform is **one Next.js application** with internal module boundaries — not a mesh of microservices. The interesting split is **authority**, not process count: the LLM orchestrates; policy and the ledger decide money.
+
+## Flow summary
+
+**Offline / ops:** store pull → policy checklist → agent runs → refund ledger → notification drain / retention
+
+**Interactive:** customer UI → session capability → Responses agent → tools → policy evaluators → SQLite transaction → SSE + admin reads → store webhook
+
+```text
+Data / orders  ->  Stage 1 agent  ->  Stage 2 policy  ->  Stage 3 ledger  ->  store write-back
+                       |                  |                  |
+                  function calls     50 evaluators     idempotent txn
+```
+
+```mermaid
+flowchart TB
+  subgraph customers [Customer path]
+    UI["/support"]
+    Chat["POST /api/support/chat SSE"]
+    VoiceIn["Realtime transcription"]
+    VoiceOut["POST /api/voice/speech"]
+  end
+  subgraph core [Server authority]
+    Agent["Agent loop"]
+    Tools["Tool registry"]
+    Policy["Policy evaluators"]
+    Exec["execute_refund transaction"]
+    DB[("SQLite")]
+  end
+  subgraph store [Commerce]
+    Pull["export-all pull"]
+    Launch["signed support launch"]
+    Refund["refund-completed"]
+  end
+  UI --> Chat
+  VoiceIn --> Chat
+  Chat --> Agent --> Tools --> Policy --> Exec --> DB
+  Exec --> VoiceOut
+  Exec --> Refund
+  Pull --> DB
+  Launch --> UI
+```
+
+## Why this shape
+
+| Problem | Approach |
+| --- | --- |
+| Model hallucinates eligibility | Deterministic evaluators; model cannot override |
+| Double refunds | Server-owned idempotency key + unique ledger intent |
+| Mic as a second brain | Transcription-only Realtime; same chat path |
+| Store drift | HMAC snapshots in; refund events out |
+| Staff confusion | One live policy, full checklist, save in place |
+
 ## Deployment boundary
 
 Jobform is one Next.js App Router application. Concerns are separated internally rather than split into premature services.

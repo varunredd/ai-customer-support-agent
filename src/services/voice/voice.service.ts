@@ -67,3 +67,32 @@ export async function getSpeakableAgentMessage(
   }
   return message;
 }
+
+const SPEECH_CACHE_LIMIT = 40;
+const speechCache = new Map<string, { bytes: Uint8Array; contentType: string }>();
+
+function speechCacheKey(sessionId: string, messageId: string) {
+  return `${sessionId}:${messageId}`;
+}
+
+export function getCachedSpeech(sessionId: string, messageId: string) {
+  return speechCache.get(speechCacheKey(sessionId, messageId)) ?? null;
+}
+
+export function setCachedSpeech(sessionId: string, messageId: string, bytes: Uint8Array, contentType: string) {
+  if (speechCache.size >= SPEECH_CACHE_LIMIT) {
+    const oldest = speechCache.keys().next().value;
+    if (oldest) speechCache.delete(oldest);
+  }
+  speechCache.set(speechCacheKey(sessionId, messageId), { bytes, contentType });
+}
+
+export async function bufferAndCacheSpeech(
+  sessionId: string,
+  messageId: string,
+  stream: ReadableStream<Uint8Array>,
+  contentType: string,
+) {
+  const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  setCachedSpeech(sessionId, messageId, bytes, contentType);
+}
