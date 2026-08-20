@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, Bot, FileText, LayoutDashboard, LogOut, MessageSquare, Receipt, ServerCog, Shield, UserRoundCheck, Users } from "lucide-react";
+import { Activity, Bot, ClipboardCheck, FileText, LayoutDashboard, LogOut, MessageSquare, Receipt, ServerCog, Shield, UserRoundCheck, Users } from "lucide-react";
 import clsx from "clsx";
 import { formatStaffRole } from "@/lib/format";
 import type { StaffRole } from "@/domain/auth/types";
@@ -93,6 +93,12 @@ export function AppSidebar() {
             <UserRoundCheck size={16} />
             Escalations
           </Link>
+          {permissions.includes("refund:approve") ? (
+            <Link href="/admin/approvals" className={clsx(styles.navItem, pathname.startsWith("/admin/approvals") && styles.navItemActive)}>
+              <ClipboardCheck size={16} />
+              Approvals
+            </Link>
+          ) : null}
           <Link href="/admin/policy" className={clsx(styles.navItem, pathname.startsWith("/admin/policy") && styles.navItemActive)}>
             <FileText size={16} />
             Refund Policy

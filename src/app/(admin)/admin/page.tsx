@@ -5,21 +5,15 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
-import { formatTime } from "@/lib/format";
+import { formatMoney, formatTime } from "@/lib/format";
 import { AdminReadRepository } from "@/repositories/admin-read.repository";
+import { RefundApprovalRepository } from "@/repositories/refund-approval.repository";
+import { SupportEscalationRepository } from "@/repositories/support-escalation.repository";
 import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 import styles from "./overview.module.css";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-interface AttentionRow {
-  id: string;
-  name: string;
-  email: string;
-  account_status: "ACTIVE" | "SUSPENDED";
-  risk_level: "LOW" | "MEDIUM" | "HIGH";
-}
 
 export default function AdminOverviewPage() {
   const db = getDatabase();
@@ -38,9 +32,8 @@ export default function AdminOverviewPage() {
     FROM agent_events e
     JOIN agent_runs ar ON ar.id = e.run_id
     WHERE ar.tenant_id = ? AND e.type = 'DECISION' AND e.status = 'FAILED'`).get(tenantId) as { count: number }).count;
-  const attention = db
-    .prepare("SELECT id, name, email, account_status, risk_level FROM customers WHERE tenant_id = ? AND (risk_level = 'HIGH' OR account_status = 'SUSPENDED') ORDER BY name")
-    .all(tenantId) as AttentionRow[];
+  const pendingApprovals = new RefundApprovalRepository(db, tenantId).listPending(8);
+  const openEscalations = new SupportEscalationRepository(db, tenantId).listOpen(8);
 
   return (
     <div className="admin-page">
@@ -86,17 +79,35 @@ export default function AdminOverviewPage() {
           <section className="panel">
             <div className="panel-header">
               <h2 className="panel-title">Needs attention</h2>
+              <Link href="/admin/approvals" className="table-link">Approvals</Link>
             </div>
             <div className={styles.attentionList}>
-              {attention.map((customer) => (
-                <Link key={customer.id} href={`/admin/customers/${customer.id}`} className={styles.attentionItem}>
-                  <div><strong>{customer.name}</strong><span>{customer.email}</span></div>
+              {pendingApprovals.map((item) => (
+                <Link key={item.id} href="/admin/approvals" className={styles.attentionItem}>
+                  <div>
+                    <strong>Refund approval · {formatMoney(item.amountCents)}</strong>
+                    <span>{item.orderId} · {item.reason}</span>
+                  </div>
                   <div className={styles.attentionBadges}>
-                    <StatusBadge status={customer.account_status === "ACTIVE" ? "SUCCESS" : "FAILED"}>{customer.account_status}</StatusBadge>
-                    <StatusBadge status={customer.risk_level}>{customer.risk_level}</StatusBadge>
+                    <StatusBadge status="WARNING">PENDING</StatusBadge>
                   </div>
                 </Link>
               ))}
+              {openEscalations.map((item) => (
+                <Link key={item.id} href="/admin/escalations" className={styles.attentionItem}>
+                  <div>
+                    <strong>Escalation · {item.reasonCode}</strong>
+                    <span>{item.summary.slice(0, 80)}</span>
+                  </div>
+                  <div className={styles.attentionBadges}>
+                    <StatusBadge status={item.priority === "HIGH" ? "HIGH" : "WARNING"}>{item.priority}</StatusBadge>
+                    <StatusBadge status="WARNING">OPEN</StatusBadge>
+                  </div>
+                </Link>
+              ))}
+              {!pendingApprovals.length && !openEscalations.length ? (
+                <div className="state-container"><p className="state-description">Nothing waiting on staff right now.</p></div>
+              ) : null}
             </div>
           </section>
         </div>

@@ -20,6 +20,11 @@
   background: linear-gradient(135deg, rgba(254, 242, 242, 0.96), rgba(255, 255, 255, 0.96));
 }
 
+.pending {
+  border-color: rgba(180, 83, 9, 0.22);
+  background: linear-gradient(135deg, rgba(255, 251, 235, 0.96), rgba(255, 255, 255, 0.96));
+}
+
 .icon {
   flex: 0 0 auto;
   margin-top: 2px;
@@ -27,6 +32,11 @@
 
 .approved .icon { color: var(--ok); }
 .denied .icon { color: var(--error); }
+.pending .icon { color: #b45309; }
+
+.pending .titleRow strong {
+  color: #b45309;
+}
 
 .content {
   min-width: 0;

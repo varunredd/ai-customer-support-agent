@@ -448,6 +448,39 @@ export const MIGRATIONS: DatabaseMigration[] = [
       CREATE INDEX idx_users_tenant_id ON users(tenant_id);
     `,
   },
+
+  {
+    version: 6,
+    name: "phase7_hitl_refund_approvals",
+    sql: `
+      CREATE TABLE refund_approval_requests (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id),
+        run_id TEXT,
+        customer_id TEXT NOT NULL,
+        order_id TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        quantity INTEGER NOT NULL CHECK (quantity > 0),
+        reason TEXT NOT NULL,
+        condition TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0),
+        currency TEXT NOT NULL DEFAULT 'USD',
+        policy_version TEXT,
+        evaluation_json TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        request_fingerprint TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+        created_at TEXT NOT NULL,
+        decided_at TEXT,
+        decided_by_user_id TEXT,
+        decision_note TEXT,
+        UNIQUE(tenant_id, idempotency_key)
+      );
+
+      CREATE INDEX idx_refund_approvals_tenant_status
+        ON refund_approval_requests(tenant_id, status, created_at DESC);
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.at(-1)?.version ?? 0;

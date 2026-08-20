@@ -14,6 +14,14 @@ export type SupportOutcome =
       refundId: null;
       title: string;
       description: string;
+    }
+  | {
+      kind: "PENDING_APPROVAL";
+      amountCents: number;
+      refundId: null;
+      approvalId: string | null;
+      title: string;
+      description: string;
     };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -67,6 +75,21 @@ export function supportOutcomeFromEvent(event: PersistedAgentEvent): SupportOutc
       refundId: refund && typeof refund.id === "string" ? refund.id : null,
       title: "Refund completed",
       description: "The approved refund was recorded successfully.",
+    };
+  }
+
+  if (event.type === "REFUND_EXECUTION" && metadata.status === "PENDING_APPROVAL") {
+    const evaluation = asRecord(metadata.evaluation);
+    const amountCents = evaluation && typeof evaluation.refundAmountCents === "number"
+      ? evaluation.refundAmountCents
+      : 0;
+    return {
+      kind: "PENDING_APPROVAL",
+      amountCents,
+      refundId: null,
+      approvalId: typeof metadata.approvalId === "string" ? metadata.approvalId : null,
+      title: "Manager approval required",
+      description: "This refund passed policy checks but exceeds the automatic approval limit. A support manager will review it.",
     };
   }
 

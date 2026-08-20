@@ -29,10 +29,20 @@ export type ExecuteRefundResult =
       idempotentReplay: boolean;
       refund: RefundRecord;
       evaluation: RefundEvaluation;
+      approvalId?: null;
     }
   | {
       status: "DENIED";
       idempotentReplay: false;
       refund: null;
       evaluation: RefundEvaluation;
+      approvalId?: null;
+    }
+  | {
+      status: "PENDING_APPROVAL";
+      idempotentReplay: boolean;
+      refund: null;
+      evaluation: RefundEvaluation;
+      approvalId: string;
+      autoApproveMaxCents: number;
     };

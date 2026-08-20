@@ -4,7 +4,9 @@ import type { ExecuteRefundInput, ExecuteRefundResult, RefundRecord } from "@/do
 import type { Customer, Order, OrderItem, RefundEvaluation, RefundRequest } from "@/domain/refunds/types";
 import { RefundPolicyRepository } from "@/repositories/refund-policy.repository";
 import { NotificationOutboxRepository } from "@/repositories/notification-outbox.repository";
+import { RefundApprovalRepository } from "@/repositories/refund-approval.repository";
 import { evaluateRefundEligibility } from "@/services/refund-eligibility.service";
+import { resolveAutoApproveMaxCents } from "@/services/refund-approval-threshold.service";
 import { resolveTenantId } from "@/services/tenant/tenant-context.service";
 
 interface ExistingRefundRow {
@@ -190,6 +192,31 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
       };
     }
 
+    const pendingApproval = new RefundApprovalRepository(db, tenant).findByIdempotencyKey(input.idempotencyKey);
+    if (pendingApproval) {
+      if (pendingApproval.requestFingerprint !== requestFingerprint) {
+        throw new IdempotencyConflictError();
+      }
+      if (pendingApproval.status === "PENDING") {
+        return {
+          status: "PENDING_APPROVAL",
+          idempotentReplay: true,
+          refund: null,
+          evaluation: pendingApproval.evaluation,
+          approvalId: pendingApproval.id,
+          autoApproveMaxCents: resolveAutoApproveMaxCents(db, tenant),
+        };
+      }
+      if (pendingApproval.status === "REJECTED") {
+        return {
+          status: "DENIED",
+          idempotentReplay: false,
+          refund: null,
+          evaluation: pendingApproval.evaluation,
+        };
+      }
+    }
+
     const customerRow = db.prepare("SELECT * FROM customers WHERE tenant_id = ? AND id = ?").get(tenant, input.request.customerId) as
       | CustomerRow
       | undefined;
@@ -246,6 +273,27 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
 
     if (evaluation.decision !== "APPROVE") {
       return { status: "DENIED", idempotentReplay: false, refund: null, evaluation };
+    }
+
+    const autoApproveMaxCents = resolveAutoApproveMaxCents(db, tenant);
+    if (evaluation.refundAmountCents > autoApproveMaxCents) {
+      const approval = new RefundApprovalRepository(db, tenant).createPending({
+        runId: input.runId,
+        request: input.request,
+        amountCents: evaluation.refundAmountCents,
+        policyVersion: policy.version,
+        evaluation,
+        idempotencyKey: input.idempotencyKey,
+        requestFingerprint,
+      });
+      return {
+        status: "PENDING_APPROVAL",
+        idempotentReplay: false,
+        refund: null,
+        evaluation,
+        approvalId: approval.id,
+        autoApproveMaxCents,
+      };
     }
 
     const now = new Date().toISOString();
@@ -320,6 +368,175 @@ export function executeRefundAtomically(db: AppDatabase, input: ExecuteRefundInp
         condition: result.refund!.condition,
       }),
     );
+  }
+  return result;
+}
+
+export function rejectRefundApproval(
+  db: AppDatabase,
+  approvalId: string,
+  actorUserId: string,
+  note?: string,
+  tenantId?: string,
+) {
+  const tenant = resolveTenantId(db, tenantId);
+  const repo = new RefundApprovalRepository(db, tenant);
+  const current = repo.findById(approvalId);
+  if (!current) throw new Error("Approval request was not found.");
+  if (current.status !== "PENDING") throw new Error("Only pending approvals can be rejected.");
+  return repo.markDecided(approvalId, {
+    status: "REJECTED",
+    decidedByUserId: actorUserId,
+    decisionNote: note,
+  });
+}
+
+/** Manager override: re-check policy, write ledger, mark approval APPROVED. */
+export function approveRefundApproval(
+  db: AppDatabase,
+  approvalId: string,
+  actorUserId: string,
+  note?: string,
+  tenantId?: string,
+): ExecuteRefundResult {
+  const tenant = resolveTenantId(db, tenantId);
+  const repo = new RefundApprovalRepository(db, tenant);
+  const current = repo.findById(approvalId);
+  if (!current) throw new Error("Approval request was not found.");
+  if (current.status !== "PENDING") throw new Error("Only pending approvals can be approved.");
+
+  const result = executeRefundAtomically(db, {
+    idempotencyKey: current.idempotencyKey,
+    runId: current.runId ?? undefined,
+    request: {
+      customerId: current.customerId,
+      orderId: current.orderId,
+      itemId: current.itemId,
+      quantity: current.quantity,
+      reason: current.reason,
+      condition: current.condition,
+      requestedAt: new Date().toISOString(),
+    },
+  }, tenant);
+
+  // Manual path: if still gated by threshold, force-complete inside a transaction.
+  if (result.status === "PENDING_APPROVAL") {
+    const forced = db.transaction((): ExecuteRefundResult => {
+      const existing = db
+        .prepare("SELECT * FROM refunds WHERE tenant_id = ? AND idempotency_key = ?")
+        .get(tenant, current.idempotencyKey) as ExistingRefundRow | undefined;
+      if (existing) {
+        repo.markDecided(approvalId, { status: "APPROVED", decidedByUserId: actorUserId, decisionNote: note });
+        return {
+          status: "COMPLETED",
+          idempotentReplay: true,
+          refund: mapExistingRefund(existing),
+          evaluation: parseStoredEvaluation(existing.evaluation_json),
+        };
+      }
+
+      const customerRow = db.prepare("SELECT * FROM customers WHERE tenant_id = ? AND id = ?").get(tenant, current.customerId) as CustomerRow | undefined;
+      const orderRow = db.prepare("SELECT * FROM orders WHERE tenant_id = ? AND id = ?").get(tenant, current.orderId) as OrderRow | undefined;
+      if (!customerRow || !orderRow) {
+        throw new Error("Customer or order for this approval no longer exists.");
+      }
+      const alreadyRefunded = db
+        .prepare("SELECT COALESCE(SUM(quantity), 0) AS quantity FROM refunds WHERE tenant_id = ? AND item_id = ?")
+        .get(tenant, current.itemId) as { quantity: number };
+      const customer = mapCustomer(customerRow);
+      const order = loadOrder(db, orderRow);
+      const policy = new RefundPolicyRepository(db, tenant).getActive();
+      const request: RefundRequest = {
+        customerId: current.customerId,
+        orderId: current.orderId,
+        itemId: current.itemId,
+        quantity: current.quantity,
+        reason: current.reason,
+        condition: current.condition,
+        requestedAt: new Date().toISOString(),
+      };
+      const evaluation = evaluateRefundEligibility(customer, order, request, {
+        alreadyRefundedItemQuantity: alreadyRefunded.quantity,
+        policy,
+      });
+      if (evaluation.decision !== "APPROVE") {
+        return { status: "DENIED", idempotentReplay: false, refund: null, evaluation };
+      }
+
+      const now = new Date().toISOString();
+      const refundId = `ref_${randomUUID()}`;
+      const runIdExists = current.runId
+        ? Boolean(db.prepare("SELECT 1 AS ok FROM agent_runs WHERE id = ?").get(current.runId))
+        : false;
+      db.prepare(`
+        INSERT INTO refunds (
+          id, tenant_id, idempotency_key, request_fingerprint, run_id, customer_id, order_id, item_id,
+          quantity, reason, condition, amount_cents, currency, status, policy_version, evaluation_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'USD', 'COMPLETED', ?, ?, ?)
+      `).run(
+        refundId,
+        tenant,
+        current.idempotencyKey,
+        current.requestFingerprint,
+        runIdExists ? current.runId : null,
+        current.customerId,
+        current.orderId,
+        current.itemId,
+        current.quantity,
+        current.reason,
+        current.condition,
+        evaluation.refundAmountCents,
+        policy.version,
+        JSON.stringify(evaluation),
+        now,
+      );
+      db.prepare("UPDATE orders SET refunded_cents = refunded_cents + ? WHERE tenant_id = ? AND id = ?")
+        .run(evaluation.refundAmountCents, tenant, current.orderId);
+      db.prepare("UPDATE customers SET lifetime_refunds = lifetime_refunds + 1 WHERE tenant_id = ? AND id = ?")
+        .run(tenant, current.customerId);
+      new NotificationOutboxRepository(db, tenant).enqueue({
+        eventKey: `refund-completed:${refundId}`,
+        eventType: "REFUND_COMPLETED",
+        recipient: customer.email,
+        subject: `Refund confirmed for order ${current.orderId}`,
+        payload: {
+          refundId,
+          orderId: current.orderId,
+          amountCents: evaluation.refundAmountCents,
+          currency: "USD",
+          policyVersion: policy.version,
+          manuallyApproved: true,
+        },
+      });
+      repo.markDecided(approvalId, { status: "APPROVED", decidedByUserId: actorUserId, decisionNote: note });
+      const row = db.prepare("SELECT * FROM refunds WHERE tenant_id = ? AND id = ?").get(tenant, refundId) as ExistingRefundRow;
+      return {
+        status: "COMPLETED",
+        idempotentReplay: false,
+        refund: mapExistingRefund(row),
+        evaluation,
+      };
+    });
+    const completed = forced.immediate();
+    if (completed.status === "COMPLETED" && !completed.idempotentReplay && completed.refund) {
+      void import("@/services/integrations/ecommerce-refund-notify.service").then(({ notifyEcommerceRefundCompleted }) =>
+        notifyEcommerceRefundCompleted({
+          refundId: completed.refund!.id,
+          customerId: completed.refund!.customerId,
+          orderId: completed.refund!.orderId,
+          itemId: completed.refund!.itemId,
+          quantity: completed.refund!.quantity,
+          amountCents: completed.refund!.amountCents,
+          reason: completed.refund!.reason,
+          condition: completed.refund!.condition,
+        }),
+      );
+    }
+    return completed;
+  }
+
+  if (result.status === "COMPLETED") {
+    repo.markDecided(approvalId, { status: "APPROVED", decidedByUserId: actorUserId, decisionNote: note });
   }
   return result;
 }

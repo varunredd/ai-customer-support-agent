@@ -84,4 +84,14 @@ export class SupportEscalationRepository {
     const safeLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
     return (this.db.prepare("SELECT * FROM support_escalations WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?").all(this.tenantId, safeLimit) as Row[]).map(map);
   }
+
+  listOpen(limit = 50): SupportEscalation[] {
+    const safeLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
+    return (this.db.prepare(`
+      SELECT * FROM support_escalations
+      WHERE tenant_id = ? AND status = 'OPEN'
+      ORDER BY CASE priority WHEN 'HIGH' THEN 0 ELSE 1 END, created_at DESC
+      LIMIT ?
+    `).all(this.tenantId, safeLimit) as Row[]).map(map);
+  }
 }

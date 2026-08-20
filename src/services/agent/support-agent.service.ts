@@ -110,16 +110,24 @@ async function maybeLogDeterministicEvents(
 
   if (toolName === "execute_refund" && result && typeof result === "object" && !Array.isArray(result)) {
     const execution = result as Record<string, unknown>;
+    const status = execution.status;
     await appendEvent({
       runId,
       type: "REFUND_EXECUTION",
-      status: execution.status === "COMPLETED" ? "SUCCESS" : "FAILED",
-      title: execution.status === "COMPLETED" ? "Refund execution completed" : "Refund execution blocked",
+      status: status === "COMPLETED" ? "SUCCESS" : status === "PENDING_APPROVAL" ? "WARNING" : "FAILED",
+      title:
+        status === "COMPLETED"
+          ? "Refund execution completed"
+          : status === "PENDING_APPROVAL"
+            ? "Refund queued for manager approval"
+            : "Refund execution blocked",
       metadata: {
         status: execution.status,
         idempotentReplay: execution.idempotentReplay,
         refund: execution.refund,
         evaluation: execution.evaluation,
+        approvalId: execution.approvalId ?? null,
+        autoApproveMaxCents: execution.autoApproveMaxCents ?? null,
       },
     });
   }
