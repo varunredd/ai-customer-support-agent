@@ -7,6 +7,7 @@ import {
   type OutboundWebhookEvent,
 } from "@/domain/integrations/types";
 import { OutboundWebhookRepository } from "@/repositories/outbound-webhook.repository";
+import { NotificationOutboxRepository } from "@/repositories/notification-outbox.repository";
 import { TenantIntegrationRepository } from "@/repositories/tenant-integration.repository";
 import { decryptSecret, encryptSecret, integrationEncryptionConfigured, SecretBoxError } from "@/security/secret-box";
 import { resolveTenantId } from "@/services/tenant/tenant-context.service";
@@ -115,9 +116,19 @@ export function getPublicIntegrationStatus(db: AppDatabase, tenantId?: string) {
     LIMIT 1
   `).get(tenant) as { source: string; status: string; created_at: string } | undefined;
   const deliveries = new OutboundWebhookRepository(db, tenant).listRecent(12);
+  const webhookCounts = new OutboundWebhookRepository(db, tenant).countByStatus();
+  const notificationCounts = new NotificationOutboxRepository(db, tenant).countByStatus();
+  const degraded = webhookCounts.DEAD > 0 || notificationCounts.DEAD > 0 || lastEvent?.status === "REJECTED";
 
   return {
     encryptionReady: integrationEncryptionConfigured(),
+    health: {
+      status: degraded ? "DEGRADED" as const : "HEALTHY" as const,
+      webhookPending: webhookCounts.PENDING,
+      webhookDead: webhookCounts.DEAD,
+      notificationPending: notificationCounts.PENDING,
+      notificationDead: notificationCounts.DEAD,
+    },
     commerce: {
       configured: commerce.configured,
       host: hostFromUrl(commerce.baseUrl),

@@ -552,6 +552,18 @@ export const MIGRATIONS: DatabaseMigration[] = [
         ON outbound_webhook_deliveries(tenant_id, created_at DESC);
     `,
   },
+
+  {
+    version: 9,
+    name: "phase7_observability",
+    sql: `
+      ALTER TABLE operational_events ADD COLUMN session_id TEXT;
+      CREATE INDEX idx_operational_events_session
+        ON operational_events(session_id, created_at DESC);
+      CREATE INDEX idx_operational_events_run
+        ON operational_events(run_id, created_at DESC);
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.at(-1)?.version ?? 0;

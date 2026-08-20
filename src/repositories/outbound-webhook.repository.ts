@@ -91,6 +91,13 @@ export class OutboundWebhookRepository {
     return row ? map(row) : null;
   }
 
+  findById(id: string): OutboundWebhookDelivery | null {
+    const row = this.db.prepare(
+      "SELECT * FROM outbound_webhook_deliveries WHERE tenant_id = ? AND id = ?",
+    ).get(this.tenantId, id) as Row | undefined;
+    return row ? map(row) : null;
+  }
+
   listRecent(limit = 25): OutboundWebhookDelivery[] {
     const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
     return (this.db.prepare(`
@@ -131,5 +138,36 @@ export class OutboundWebhookRepository {
       SET status = ?, attempts = ?, next_attempt_at = ?, last_error = ?, response_status = ?, updated_at = ?
       WHERE id = ?
     `).run(dead ? "DEAD" : "PENDING", attempts, next, error.slice(0, 1000), responseStatus ?? null, now, id);
+    return dead;
+  }
+
+  countByStatus() {
+    const rows = this.db.prepare(`
+      SELECT status, COUNT(*) AS count
+      FROM outbound_webhook_deliveries
+      WHERE tenant_id = ?
+      GROUP BY status
+    `).all(this.tenantId) as Array<{ status: OutboundWebhookStatus; count: number }>;
+    const counts = { PENDING: 0, SENT: 0, DEAD: 0 };
+    for (const row of rows) counts[row.status] = row.count;
+    return counts;
+  }
+
+  requeueDead(id?: string) {
+    const now = new Date().toISOString();
+    if (id) {
+      const result = this.db.prepare(`
+        UPDATE outbound_webhook_deliveries
+        SET status = 'PENDING', attempts = 0, next_attempt_at = ?, last_error = NULL, updated_at = ?
+        WHERE tenant_id = ? AND id = ? AND status = 'DEAD'
+      `).run(now, now, this.tenantId, id);
+      return result.changes;
+    }
+    const result = this.db.prepare(`
+      UPDATE outbound_webhook_deliveries
+      SET status = 'PENDING', attempts = 0, next_attempt_at = ?, last_error = NULL, updated_at = ?
+      WHERE tenant_id = ? AND status = 'DEAD'
+    `).run(now, now, this.tenantId);
+    return result.changes;
   }
 }

@@ -11,6 +11,10 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const parsed = Number.parseInt(url.searchParams.get("limit") ?? "50", 10);
   const limit = Number.isInteger(parsed) ? parsed : 50;
-  const runs = new AdminReadRepository(getDatabase()).listRunSummaries(limit);
+  const statusParam = url.searchParams.get("status");
+  const status = statusParam === "FAILED" || statusParam === "COMPLETED" || statusParam === "IN_PROGRESS"
+    ? statusParam
+    : undefined;
+  const runs = new AdminReadRepository(getDatabase()).listRunSummaries(limit, status ? { status } : {});
   return Response.json({ runs });
 }

@@ -34,8 +34,18 @@ export async function drainOutboundWebhooks(
   for (const delivery of pending) {
     const webhook = resolveWebhookCredentials(db, delivery.tenantId);
     if (!webhook.configured || !webhook.url || !webhook.secret) {
-      repository.markFailed(delivery.id, "Webhook destination is not configured.");
+      const dead = repository.markFailed(delivery.id, "Webhook destination is not configured.");
       failed += 1;
+      if (dead) {
+        operationalLog({
+          severity: "ERROR",
+          source: "outbound-webhooks",
+          code: "WEBHOOK_DEAD",
+          message: "Outbound merchant webhook exhausted retries.",
+          metadata: { deliveryId: delivery.id, eventType: delivery.eventType },
+          tenantId: delivery.tenantId,
+        }, db);
+      }
       continue;
     }
     const rawBody = JSON.stringify({
@@ -67,8 +77,18 @@ export async function drainOutboundWebhooks(
       });
       if (!response.ok) {
         const text = await response.text().catch(() => "");
-        repository.markFailed(delivery.id, text.slice(0, 500) || `HTTP ${response.status}`, response.status);
+        const dead = repository.markFailed(delivery.id, text.slice(0, 500) || `HTTP ${response.status}`, response.status);
         failed += 1;
+        if (dead) {
+          operationalLog({
+            severity: "ERROR",
+            source: "outbound-webhooks",
+            code: "WEBHOOK_DEAD",
+            message: "Outbound merchant webhook exhausted retries.",
+            metadata: { deliveryId: delivery.id, eventType: delivery.eventType },
+            tenantId: delivery.tenantId,
+          }, db);
+        }
         continue;
       }
       repository.markSent(delivery.id, response.status);
@@ -82,8 +102,18 @@ export async function drainOutboundWebhooks(
       }, db);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Webhook delivery failed.";
-      repository.markFailed(delivery.id, message);
+      const dead = repository.markFailed(delivery.id, message);
       failed += 1;
+      if (dead) {
+        operationalLog({
+          severity: "ERROR",
+          source: "outbound-webhooks",
+          code: "WEBHOOK_DEAD",
+          message: "Outbound merchant webhook exhausted retries.",
+          metadata: { deliveryId: delivery.id, eventType: delivery.eventType },
+          tenantId: delivery.tenantId,
+        }, db);
+      }
     }
   }
 

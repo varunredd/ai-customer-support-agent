@@ -82,13 +82,17 @@ export async function drainNotificationOutbox(
       }, db);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      repository.markFailed(notification.id, message);
+      const dead = repository.markFailed(notification.id, message);
       failed += 1;
       operationalLog({
         severity: message === "RESEND_NOT_CONFIGURED" ? "WARN" : "ERROR",
         source: "notifications",
-        code: message === "RESEND_NOT_CONFIGURED" ? "NOTIFICATION_PROVIDER_NOT_CONFIGURED" : "NOTIFICATION_SEND_FAILED",
-        message: message === "RESEND_NOT_CONFIGURED" ? "Resend notification delivery is not configured." : "Customer notification delivery failed.",
+        code: dead
+          ? "NOTIFICATION_DEAD"
+          : message === "RESEND_NOT_CONFIGURED" ? "NOTIFICATION_PROVIDER_NOT_CONFIGURED" : "NOTIFICATION_SEND_FAILED",
+        message: dead
+          ? "Customer notification exhausted retries."
+          : message === "RESEND_NOT_CONFIGURED" ? "Resend notification delivery is not configured." : "Customer notification delivery failed.",
         metadata: { notificationId: notification.id, eventType: notification.eventType },
       }, db);
     }

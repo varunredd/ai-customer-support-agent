@@ -121,6 +121,32 @@ export default function IntegrationsPage() {
     }
   }
 
+  async function retryDeadLetters(action: "retry-webhooks" | "retry-notifications") {
+    setBusy(action);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/admin/integrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const payload = await response.json() as {
+        integrations?: AdminIntegrationStatus;
+        retried?: number;
+        drain?: { processed: number; sent: number; failed: number };
+        error?: { message: string };
+      };
+      if (!response.ok) throw new Error(payload.error?.message ?? "Unable to retry failed deliveries.");
+      if (payload.integrations) applyStatus(payload.integrations);
+      setMessage(`Requeued ${payload.retried ?? 0} dead ${action === "retry-webhooks" ? "webhooks" : "notifications"}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to retry failed deliveries.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function toggleEvent(event: OutboundWebhookEvent) {
     setWebhookEvents((current) => (
       current.includes(event) ? current.filter((item) => item !== event) : [...current, event]
@@ -139,6 +165,57 @@ export default function IntegrationsPage() {
         {error ? <ErrorState description={error} /> : null}
         {integrations ? (
           <>
+            <section className="panel" data-testid="integration-health">
+              <div className="panel-header">
+                <div>
+                  <h2 className="panel-title">Health</h2>
+                  <p className="panel-subtitle">Dead-letter queues for signed webhooks and customer email.</p>
+                </div>
+                <StatusBadge status={integrations.health.status === "HEALTHY" ? "SUCCESS" : "WARNING"}>
+                  {integrations.health.status}
+                </StatusBadge>
+              </div>
+              <div className="panel-body">
+                <div className="kpi-grid">
+                  <div>
+                    <p className="field-label">Webhook pending</p>
+                    <p className="text-strong">{integrations.health.webhookPending}</p>
+                  </div>
+                  <div>
+                    <p className="field-label">Webhook dead</p>
+                    <p className="text-strong">{integrations.health.webhookDead}</p>
+                  </div>
+                  <div>
+                    <p className="field-label">Email pending</p>
+                    <p className="text-strong">{integrations.health.notificationPending}</p>
+                  </div>
+                  <div>
+                    <p className="field-label">Email dead</p>
+                    <p className="text-strong">{integrations.health.notificationDead}</p>
+                  </div>
+                </div>
+                <div className="toolbar" style={{ marginTop: 16 }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    data-testid="retry-webhooks"
+                    disabled={busy !== null || integrations.health.webhookDead === 0}
+                    onClick={() => void retryDeadLetters("retry-webhooks")}
+                  >
+                    Retry dead webhooks
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    data-testid="retry-notifications"
+                    disabled={busy !== null || integrations.health.notificationDead === 0}
+                    onClick={() => void retryDeadLetters("retry-notifications")}
+                  >
+                    Retry dead email
+                  </button>
+                </div>
+              </div>
+            </section>
             <div className={styles.columns}>
               <section className="panel">
                 <div className="panel-header">

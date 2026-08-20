@@ -19,6 +19,12 @@ export function formatTime(iso: string): string {
   }).format(new Date(iso));
 }
 
+export function formatDurationMs(ms: number | null | undefined) {
+  if (ms == null || !Number.isFinite(ms)) return "—";
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
 export function getInitials(name: string): string {
   return name
     .split(" ")

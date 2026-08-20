@@ -58,6 +58,7 @@ export interface RunSupportAgentInput {
   orderId?: string;
   requestedAt?: string;
   runId?: string;
+  sessionId?: string;
   conversationHistory?: AgentConversationTurn[];
 }
 

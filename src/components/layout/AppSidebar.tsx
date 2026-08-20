@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Plug,
   Receipt,
+  CircleAlert,
   ScrollText,
   ServerCog,
   Shield,
@@ -56,6 +57,7 @@ const NAV_SECTIONS: Array<{ label: string; items: NavItem[] }> = [
     label: "AI ops",
     items: [
       { href: "/admin/runs", label: "Agent runs", icon: <Activity size={16} /> },
+      { href: "/admin/failed-runs", label: "Failed runs", icon: <CircleAlert size={16} /> },
       { href: "/admin/decisions", label: "Decisions", icon: <ScrollText size={16} /> },
     ],
   },

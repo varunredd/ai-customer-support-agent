@@ -106,7 +106,7 @@ export class NotificationOutboxRepository {
 
   markFailed(id: string, errorMessage: string, maxAttempts = 5) {
     const row = this.db.prepare("SELECT attempts FROM notification_outbox WHERE id = ? AND tenant_id = ?").get(id, this.tenantId) as { attempts: number } | undefined;
-    if (!row) return;
+    if (!row) return false;
     const attempts = row.attempts + 1;
     const dead = attempts >= maxAttempts;
     const delayMinutes = Math.min(60, 2 ** Math.min(attempts, 5));
@@ -115,6 +115,37 @@ export class NotificationOutboxRepository {
     this.db.prepare(`UPDATE notification_outbox SET
       status = ?, attempts = ?, next_attempt_at = ?, last_error = ?, updated_at = ?
       WHERE id = ? AND tenant_id = ?`).run(dead ? "DEAD" : "PENDING", attempts, nextAttemptAt, errorMessage.slice(0, 1000), now, id, this.tenantId);
+    return dead;
+  }
+
+  countByStatus() {
+    const rows = this.db.prepare(`
+      SELECT status, COUNT(*) AS count
+      FROM notification_outbox
+      WHERE tenant_id = ?
+      GROUP BY status
+    `).all(this.tenantId) as Array<{ status: NotificationStatus; count: number }>;
+    const counts = { PENDING: 0, SENT: 0, DEAD: 0 };
+    for (const row of rows) counts[row.status] = row.count;
+    return counts;
+  }
+
+  requeueDead(id?: string) {
+    const now = new Date().toISOString();
+    if (id) {
+      const result = this.db.prepare(`
+        UPDATE notification_outbox
+        SET status = 'PENDING', attempts = 0, next_attempt_at = ?, last_error = NULL, updated_at = ?
+        WHERE tenant_id = ? AND id = ? AND status = 'DEAD'
+      `).run(now, now, this.tenantId, id);
+      return result.changes;
+    }
+    const result = this.db.prepare(`
+      UPDATE notification_outbox
+      SET status = 'PENDING', attempts = 0, next_attempt_at = ?, last_error = NULL, updated_at = ?
+      WHERE tenant_id = ? AND status = 'DEAD'
+    `).run(now, now, this.tenantId);
+    return result.changes;
   }
 
   listRecent(limit = 50): NotificationRecord[] {

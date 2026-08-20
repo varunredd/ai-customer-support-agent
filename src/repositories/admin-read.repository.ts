@@ -32,6 +32,9 @@ export interface AdminRunSummary {
   decision: "APPROVE" | "DENY" | null;
   decisionStatus: AgentEventStatus | null;
   refundAmountCents: number | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  durationMs: number | null;
 }
 
 interface RefundRow {
@@ -62,6 +65,23 @@ interface RunSummaryRow {
   event_count: number;
   decision_status: AgentEventStatus | null;
   decision_metadata_json: string | null;
+  error_code: string | null;
+  error_message: string | null;
+}
+
+function durationMs(startedAt: string, completedAt: string | null) {
+  if (!completedAt) return null;
+  const started = Date.parse(startedAt);
+  const completed = Date.parse(completedAt);
+  if (!Number.isFinite(started) || !Number.isFinite(completed) || completed < started) return null;
+  return completed - started;
+}
+
+function percentile(values: number[], p: number) {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
+  return Math.round(sorted[index] ?? 0);
 }
 
 function parseDecision(value: string | null): { decision: "APPROVE" | "DENY" | null; refundAmountCents: number | null } {
@@ -120,22 +140,22 @@ export class AdminReadRepository {
     }));
   }
 
-  listRunSummaries(limit = 50): AdminRunSummary[] {
+  listRunSummaries(limit = 50, options: { status?: AgentRunStatus } = {}): AdminRunSummary[] {
     const safeLimit = Math.max(1, Math.min(200, Math.trunc(limit)));
     const rows = this.db
       .prepare(
         `SELECT ar.id, ar.status, ar.model, ar.customer_id, c.name AS customer_name, ar.order_id,
-                ar.started_at, ar.completed_at,
+                ar.started_at, ar.completed_at, ar.error_code, ar.error_message,
                 (SELECT COUNT(*) FROM agent_events e WHERE e.run_id = ar.id) AS event_count,
                 (SELECT e.status FROM agent_events e WHERE e.run_id = ar.id AND e.type = 'DECISION' ORDER BY e.sequence DESC LIMIT 1) AS decision_status,
                 (SELECT e.metadata_json FROM agent_events e WHERE e.run_id = ar.id AND e.type = 'DECISION' ORDER BY e.sequence DESC LIMIT 1) AS decision_metadata_json
          FROM agent_runs ar
          LEFT JOIN customers c ON c.id = ar.customer_id AND c.tenant_id = ar.tenant_id
-         WHERE ar.tenant_id = ?
+         WHERE ar.tenant_id = ? ${options.status ? "AND ar.status = ?" : ""}
          ORDER BY ar.started_at DESC
          LIMIT ?`,
       )
-      .all(this.tenantId, safeLimit) as RunSummaryRow[];
+      .all(...(options.status ? [this.tenantId, options.status, safeLimit] : [this.tenantId, safeLimit])) as RunSummaryRow[];
 
     return rows.map((row) => {
       const decision = parseDecision(row.decision_metadata_json);
@@ -152,6 +172,9 @@ export class AdminReadRepository {
         decision: decision.decision,
         decisionStatus: row.decision_status,
         refundAmountCents: decision.refundAmountCents,
+        errorCode: row.error_code,
+        errorMessage: row.error_message,
+        durationMs: durationMs(row.started_at, row.completed_at),
       };
     });
   }
@@ -250,9 +273,34 @@ export class AdminReadRepository {
     const managerApproved = count("SELECT COUNT(*) AS count FROM refund_approval_requests WHERE tenant_id = ? AND status = 'APPROVED'", this.tenantId);
     const openEscalations = count("SELECT COUNT(*) AS count FROM support_escalations WHERE tenant_id = ? AND status = 'OPEN'", this.tenantId);
     const conversations = count("SELECT COUNT(*) AS count FROM support_sessions WHERE tenant_id = ?", this.tenantId);
+    const escalationsTotal = count("SELECT COUNT(*) AS count FROM support_escalations WHERE tenant_id = ?", this.tenantId);
     const automatedRefunds = Math.max(0, refunds.count - managerApproved);
     const decidedOutcomes = automatedRefunds + managerApproved + pendingApprovals + policyDenials;
     const automationRate = decidedOutcomes > 0 ? automatedRefunds / decidedOutcomes : 0;
+    const escalationRate = runsCompleted + runsFailed > 0 ? escalationsTotal / (runsCompleted + runsFailed) : 0;
+    const latencies = (this.db.prepare(`
+      SELECT started_at, completed_at FROM agent_runs
+      WHERE tenant_id = ? AND completed_at IS NOT NULL
+    `).all(this.tenantId) as Array<{ started_at: string; completed_at: string }>).
+      map((row) => durationMs(row.started_at, row.completed_at)).
+      filter((value): value is number => value != null);
+    const webhookCounts = this.db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN status = 'DEAD' THEN 1 ELSE 0 END), 0) AS dead,
+        COALESCE(SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END), 0) AS pending
+      FROM outbound_webhook_deliveries WHERE tenant_id = ?
+    `).get(this.tenantId) as { dead: number; pending: number };
+    const notificationCounts = this.db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN status = 'DEAD' THEN 1 ELSE 0 END), 0) AS dead,
+        COALESCE(SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END), 0) AS pending
+      FROM notification_outbox WHERE tenant_id = ?
+    `).get(this.tenantId) as { dead: number; pending: number };
+    const modelRequests = count(`
+      SELECT COUNT(*) AS count FROM agent_events e
+      JOIN agent_runs ar ON ar.id = e.run_id
+      WHERE ar.tenant_id = ? AND e.type = 'MODEL_REQUEST'
+    `, this.tenantId);
 
     return {
       runsTotal,
@@ -267,6 +315,14 @@ export class AdminReadRepository {
       openEscalations,
       conversations,
       automationRate,
+      escalationRate,
+      p95LatencyMs: percentile(latencies, 95),
+      modelRequests,
+      openaiCostUsd: null,
+      webhookDead: webhookCounts.dead,
+      webhookPending: webhookCounts.pending,
+      notificationDead: notificationCounts.dead,
+      notificationPending: notificationCounts.pending,
     };
   }
 
@@ -314,6 +370,14 @@ export interface AdminAnalyticsSnapshot {
   openEscalations: number;
   conversations: number;
   automationRate: number;
+  escalationRate: number;
+  p95LatencyMs: number | null;
+  modelRequests: number;
+  openaiCostUsd: number | null;
+  webhookDead: number;
+  webhookPending: number;
+  notificationDead: number;
+  notificationPending: number;
 }
 
 export type AdminIntegrationStatus = PublicIntegrationStatus;

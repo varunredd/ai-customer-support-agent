@@ -129,6 +129,7 @@ export async function POST(request: Request) {
             model,
             {
               runId,
+              sessionId,
               message,
               customerEmail: detail.customer.email,
               orderId: detail.order.id,
@@ -157,6 +158,7 @@ export async function POST(request: Request) {
             message: "Support agent run completed.",
             requestId,
             runId,
+            sessionId,
             metadata: { sessionId, status: result.status },
           }, db);
           if (process.env.NOTIFICATION_DELIVERY_MODE === "inline") {
@@ -175,6 +177,7 @@ export async function POST(request: Request) {
             message: "Support agent run failed.",
             requestId,
             runId,
+            sessionId,
             metadata: { sessionId },
           }, db);
           send("error", publicFailure);

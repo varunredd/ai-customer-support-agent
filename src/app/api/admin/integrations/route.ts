@@ -7,6 +7,9 @@ import {
   drainOutboundWebhooks,
   enqueueOutboundWebhook,
 } from "@/services/integrations/outbound-webhook.service";
+import { drainNotificationOutbox } from "@/services/notifications/notification.service";
+import { OutboundWebhookRepository } from "@/repositories/outbound-webhook.repository";
+import { NotificationOutboxRepository } from "@/repositories/notification-outbox.repository";
 import {
   getPublicIntegrationStatus,
   resolveWebhookCredentials,
@@ -66,6 +69,40 @@ export async function POST(request: Request) {
   if (auth instanceof Response) return auth;
   const db = getDatabase();
   const tenantId = resolveStaffTenantId(db, auth);
+  const contentType = request.headers.get("content-type") ?? "";
+  let action = "test";
+  let deliveryId: string | null = null;
+  if (contentType.includes("application/json")) {
+    try {
+      const body = asObject(await request.json());
+      if (typeof body.action === "string" && body.action.trim()) action = body.action.trim();
+      if (typeof body.deliveryId === "string" && body.deliveryId.trim()) deliveryId = body.deliveryId.trim();
+    } catch {
+      return jsonError(400, "INVALID_REQUEST", "Request body must be a JSON object.");
+    }
+  }
+
+  if (action === "retry-webhooks" || action === "retry-webhook") {
+    const changed = new OutboundWebhookRepository(db, tenantId).requeueDead(deliveryId ?? undefined);
+    if (action === "retry-webhook" && changed === 0) {
+      return jsonError(404, "WEBHOOK_NOT_FOUND", "No dead webhook delivery matched that id.");
+    }
+    const drain = await drainOutboundWebhooks(db, { limit: 25 });
+    return Response.json(
+      { retried: changed, drain, integrations: getPublicIntegrationStatus(db, tenantId) },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  if (action === "retry-notifications") {
+    const changed = new NotificationOutboxRepository(db, tenantId).requeueDead();
+    const drain = await drainNotificationOutbox(db, { limit: 25 });
+    return Response.json(
+      { retried: changed, drain, integrations: getPublicIntegrationStatus(db, tenantId) },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   const webhook = resolveWebhookCredentials(db, tenantId);
   if (!webhook.configured) {
     return jsonError(400, "WEBHOOK_NOT_CONFIGURED", "Save a webhook URL and secret before sending a test event.");

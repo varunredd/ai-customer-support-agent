@@ -56,6 +56,7 @@ export default function AdminOverviewPage() {
             <div className="panel-header">
               <h2 className="panel-title">Recent runs</h2>
               <Link href="/admin/runs" className="table-link">View all</Link>
+              <Link href="/admin/failed-runs" className="table-link">Failed runs</Link>
             </div>
             <div className="table-container">
               <table className="table">
