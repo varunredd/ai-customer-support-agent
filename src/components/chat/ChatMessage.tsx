@@ -8,9 +8,10 @@ interface ChatMessageProps {
   timestamp?: string;
   onSpeak?: () => void;
   speaking?: boolean;
+  voicePhase?: "idle" | "generating" | "playing";
 }
 
-export function ChatMessage({ role, content, timestamp, onSpeak, speaking = false }: ChatMessageProps) {
+export function ChatMessage({ role, content, timestamp, onSpeak, speaking = false, voicePhase = "idle" }: ChatMessageProps) {
   const isAgent = role === "agent";
 
   return (
@@ -32,7 +33,7 @@ export function ChatMessage({ role, content, timestamp, onSpeak, speaking = fals
               title="Play AI-generated voice"
             >
               {speaking ? <LoaderCircle size={13} className={styles.spin} /> : <Volume2 size={13} />}
-              <span>{speaking ? "Playing" : "Listen"}</span>
+              <span>{voicePhase === "generating" ? "Preparing voice" : speaking ? "Playing" : "Listen"}</span>
             </button>
           ) : null}
         </div>

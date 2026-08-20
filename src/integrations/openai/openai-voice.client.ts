@@ -37,24 +37,36 @@ function transcribeModel() {
   return requested;
 }
 
-function safeVoice(value: string | undefined) {
-  const voice = value?.trim() || "marin";
-  const allowed = new Set([
-    "alloy",
-    "ash",
-    "ballad",
-    "coral",
-    "echo",
-    "fable",
-    "nova",
-    "onyx",
-    "sage",
-    "shimmer",
-    "verse",
-    "marin",
-    "cedar",
-  ]);
-  return allowed.has(voice) ? voice : "marin";
+const TTS_1_VOICES = new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]);
+const GPT_TTS_VOICES = new Set([
+  "alloy",
+  "ash",
+  "ballad",
+  "coral",
+  "echo",
+  "fable",
+  "nova",
+  "onyx",
+  "sage",
+  "shimmer",
+  "verse",
+  "marin",
+  "cedar",
+]);
+
+function ttsModel() {
+  return process.env.OPENAI_TTS_MODEL?.trim() || "tts-1";
+}
+
+function ttsVoice() {
+  const requested = process.env.OPENAI_TTS_VOICE?.trim();
+  const model = ttsModel();
+  if (model.startsWith("tts-1")) {
+    if (requested && TTS_1_VOICES.has(requested)) return requested;
+    return "nova";
+  }
+  if (requested && GPT_TTS_VOICES.has(requested)) return requested;
+  return "marin";
 }
 
 export class OpenAIVoiceClient {
@@ -160,13 +172,7 @@ export class OpenAIVoiceClient {
         Authorization: `Bearer ${requireApiKey(this.apiKey)}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: process.env.OPENAI_TTS_MODEL?.trim() || "gpt-4o-mini-tts",
-        voice: safeVoice(process.env.OPENAI_TTS_VOICE),
-        input: clean,
-        response_format: "mp3",
-        instructions: "Speak clearly, calmly, and concisely as an AI customer support assistant.",
-      }),
+      body: JSON.stringify(ttsRequestBody(clean)),
     });
 
     if (!response.ok || !response.body) {
@@ -182,4 +188,18 @@ export class OpenAIVoiceClient {
       contentType: response.headers.get("content-type") || "audio/mpeg",
     };
   }
+}
+
+function ttsRequestBody(input: string) {
+  const model = ttsModel();
+  const body: Record<string, unknown> = {
+    model,
+    voice: ttsVoice(),
+    input,
+    response_format: "mp3",
+  };
+  if (model.includes("gpt-4o")) {
+    body.instructions = "Speak clearly, calmly, and concisely as an AI customer support assistant.";
+  }
+  return body;
 }

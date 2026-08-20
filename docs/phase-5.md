@@ -61,7 +61,9 @@ Each microphone activation handles one speech turn. A completed transcript is th
 - `sessionId`, and
 - `messageId`.
 
-The server verifies that the requested message is a persisted `AGENT` message belonging to that support session, then synthesizes that persisted text using the configured TTS model (`gpt-4o-mini-tts` by default in this build).
+The server verifies that the requested message is a persisted `AGENT` message belonging to that support session, then synthesizes that persisted text using the configured TTS model (`tts-1` by default for lower latency; `gpt-4o-mini-tts` remains available).
+
+Spoken playback starts as soon as the agent message is persisted, without waiting for a session refresh. The UI distinguishes **Preparing voice** from **Playing**. Repeat Listen requests reuse an in-memory audio cache. When the browser supports MPEG MediaSource, the first audio chunks play before the full file arrives.
 
 This keeps browser-controlled text from becoming an unrestricted TTS proxy and guarantees that spoken output matches a persisted support response.
 

@@ -35,9 +35,9 @@ services:
       - key: OPENAI_TRANSCRIBE_MODEL
         value: gpt-4o-mini-transcribe
       - key: OPENAI_TTS_MODEL
-        value: gpt-4o-mini-tts
+        value: tts-1
       - key: OPENAI_TTS_VOICE
-        value: marin
+        value: nova
       - key: OPENAI_API_KEY
         sync: false
       - key: ADMIN_EMAIL
