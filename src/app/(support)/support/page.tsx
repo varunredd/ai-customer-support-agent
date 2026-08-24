@@ -502,7 +502,7 @@ export default function SupportPage() {
               <ChatComposer
                 onSend={handleSend}
                 disabled={isSending}
-                placeholder={isSending ? "Agent is working…" : "Ask about your refund…"}
+                placeholder={isSending ? "Working on your request…" : "Describe what you need help with…"}
                 voiceState={voice.state}
                 voicePreview={voice.partialTranscript}
                 voiceError={voice.error}
@@ -510,7 +510,7 @@ export default function SupportPage() {
               />
               {voicePlaybackError ? <p className={styles.voicePlaybackError} role="status">{voicePlaybackError}</p> : null}
               <p className={styles.hint}>
-                Agent replies play automatically. Microphone turns are transcribed, then sent through the same refund agent and policy as typed messages.
+                Replies can play aloud automatically. Mic turns are transcribed, then handled by the same support agent and refund policy as typed messages.
               </p>
             </div>
           </div>

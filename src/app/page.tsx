@@ -20,18 +20,18 @@ export default function Home() {
 
       <main className={styles.main}>
         <section className={styles.hero}>
-          <p className={styles.eyebrow}>AI customer support for refunds</p>
+          <p className={styles.eyebrow}>AI refund support for commerce</p>
           <h1>
+            <span>Jobform talks to customers.</span>
             <span>Policy decides the money.</span>
-            <span>The agent handles the conversation.</span>
           </h1>
           <p className={styles.lead}>
-            Customers look up an order. The agent investigates. A policy engine approves or denies the refund.
-            The model never gets financial authority.
+            Look up an order, explain what went wrong, and get a clear refund answer. The agent runs the conversation.
+            A deterministic policy engine owns eligibility, amount, and the ledger — the model never gets financial authority.
           </p>
           <div className={styles.actions}>
             <Link href="/support" className={styles.primary}>
-              Open support portal
+              Try the support portal
               <ArrowRight size={16} />
             </Link>
             <Link href="/login" className={styles.secondary}>Staff console</Link>
@@ -41,23 +41,23 @@ export default function Home() {
         <section className={styles.grid} aria-label="Product highlights">
           <article className={styles.card}>
             <span className={styles.icon}><MessageSquare size={18} /></span>
-            <h2>Customer portal</h2>
-            <p>Start support with the email and order ID on the account. Chat stays locked to that order.</p>
+            <h2>Order-locked chat</h2>
+            <p>Customers start with email, pick an owned order, and stay bound to that account for the whole session.</p>
           </article>
           <article className={styles.card}>
             <span className={styles.icon}><Workflow size={18} /></span>
-            <h2>Store launch</h2>
-            <p>A signed-in store can open support for the authenticated customer and owned order.</p>
+            <h2>Store-launched help</h2>
+            <p>A signed-in storefront can open support for the authenticated shopper and the order they already own.</p>
           </article>
           <article className={styles.card}>
             <span className={styles.icon}><ShieldCheck size={18} /></span>
-            <h2>Policy engine</h2>
-            <p>Eligibility, amount, and ledger writes stay in server code. The model cannot bypass them.</p>
+            <h2>Policy before payout</h2>
+            <p>Fifty machine-checkable rules decide approve, deny, or escalate. Ledger writes re-check policy in a transaction.</p>
           </article>
           <article className={styles.card}>
             <span className={styles.icon}><Sparkles size={18} /></span>
-            <h2>Voice included</h2>
-            <p>Spoken turns use the same support agent and the same refund path as typed chat.</p>
+            <h2>Voice, same rules</h2>
+            <p>Microphone turns are transcribed into the same agent path — same tools, same policy, same refund ledger.</p>
           </article>
         </section>
       </main>

@@ -1,0 +1,54 @@
+JOBFORM — LinkedIn Loom (30–60 seconds)
+=====================================
+I cannot record the Loom video from here. Use this as a teleprompter while you screen-record.
+
+Target length: ~45 seconds (stay under 60).
+Tools: Loom (Chrome) or QuickTime + upload.
+Aspect: record browser window at 1440×900 or larger.
+
+PREP (before you hit record)
+----------------------------
+1. Open three tabs in this order:
+   A) https://jobform-production.up.railway.app
+   B) https://jobform-production.up.railway.app/support
+   C) /admin conversations or escalations (already signed in; do NOT show passwords on camera)
+2. Have a demo email ready (e.g. maya.returns@example.com) and one clear refund prompt.
+3. Hide bookmarks bar / personal tabs. Zoom browser to ~110% so text reads on mobile LinkedIn.
+4. Close Slack/email notifications.
+
+SHOT LIST + SCRIPT
+------------------
+0:00–0:08  LANDING
+Show `/`. Hover CTAs briefly.
+Say:
+"We built Jobform — AI customer support for refunds. The agent talks to the customer. Policy decides the money."
+
+0:08–0:22  SUPPORT PORTAL
+Switch to `/support`. Enter email → pick order → start chat. Type (or paste) one short refund request.
+Say:
+"Customers look up an order, stay locked to that account, and ask for help in chat or by voice."
+
+0:22–0:40  OUTCOME
+Scroll to show policy activity / refund card OR escalation card — whichever your demo produces cleanly.
+If refund: click once so the amount is visible.
+If escalate: show the Human Support card, then briefly open Admin → Escalations.
+Say:
+"Under the hood, deterministic policy checks approve, deny, or escalate — and the ledger re-validates before anything is written."
+
+0:40–0:50  CLOSE
+Return to landing (or GitHub README if you prefer).
+Say:
+"Live demo and source are linked in the post. Happy to take feedback."
+
+Stop. Do not keep talking past 60s.
+
+BACKUP PROMPT (paste into chat if needed)
+-----------------------------------------
+Return my studio headphones. I changed my mind. They are unopened and I want to return quantity 1.
+
+RECORDING TIPS
+--------------
+• One take is better than polish. LinkedIn rewards clarity over production.
+• Speak slightly slower than normal; Loom compresses audio.
+• If the agent is slow, narrate over the waiting state — don’t go silent.
+• After export: attach the Loom (or MP4) to the LinkedIn post with LINKEDIN_POST.txt as the caption.

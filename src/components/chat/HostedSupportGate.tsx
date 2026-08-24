@@ -9,9 +9,10 @@ export function HostedSupportGate({ error }: { error?: string | null }) {
       </div>
       <div className={styles.copy}>
         <p className={styles.eyebrow}>Store-launched support</p>
-        <h2 id="secure-support-title">Open support from your order</h2>
+        <h2 id="secure-support-title">Start from your order page</h2>
         <p>
-          This workspace accepts support only from a signed-in store or account page. Customer directories are not public.
+          This workspace opens only from a signed-in store or account page. Public email lookup is turned off here, so
+          customer identity stays with the store that launched support.
         </p>
       </div>
 
@@ -25,13 +26,13 @@ export function HostedSupportGate({ error }: { error?: string | null }) {
       <div className={styles.note}>
         <ShieldCheck size={17} />
         <div>
-          <strong>Identity stays server-bound</strong>
-          <span>A short-lived launch is exchanged once for a support-session credential kept in this browser tab.</span>
+          <strong>Secure handoff</strong>
+          <span>A one-time launch is exchanged for a session credential kept in this browser tab.</span>
         </div>
       </div>
 
       <p className={styles.help}>
-        Return to your order and choose Get help to start a new session.
+        Go back to your order and choose Get help to start a new session.
         <ExternalLink size={13} aria-hidden="true" />
       </p>
     </section>

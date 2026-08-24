@@ -1,0 +1,27 @@
+BEFORE YOU POST ON LINKEDIN
+===========================
+
+Must-do
+-------
+[ ] Deploy latest copy to Railway (landing + support text from this change set).
+[ ] Smoke-test live:
+    - / loads and CTAs work
+    - /support email lookup → session → one refund OR escalation path
+    - Admin conversations + escalations still show after a refresh
+[ ] Confirm Railway volume + DATABASE_PATH so sessions don’t wipe mid-demo.
+[ ] Record the 30–60s Loom using LINKEDIN_LOOM_SCRIPT.txt (I can’t record it for you).
+[ ] Paste LINKEDIN_POST.txt (full or short version) as the LinkedIn caption.
+[ ] Attach Loom / MP4 + 1–2 screenshots (landing + support outcome).
+
+Safety
+------
+[ ] Repo is public and README matches the demo story.
+[ ] No .env / secrets / real customer PII in screenshots, Loom, or repo.
+[ ] Do not publish staff passwords in the post or video.
+[ ] Demo accounts only (@example.com / seeded store data).
+
+Nice-to-have
+------------
+[ ] Credit teammates by name if this was a team build.
+[ ] Pin a comment with “happy to walk through architecture” after posting.
+[ ] Soft-launch to 2 friends first; fix any live break before the main post.

@@ -7,18 +7,18 @@ export function SupportPortalPanel({ merchantName }: { merchantName?: string }) 
     <div className={styles.panel}>
       <section className={styles.section}>
         <p className="eyebrow">How support starts</p>
-        <h3 className={styles.name}>Choose an order</h3>
+        <h3 className={styles.name}>Find your order</h3>
         <p className={styles.meta}>
-          {storeName} matches your email to customer-owned orders. You pick the order; the agent cannot switch accounts later.
+          {storeName} matches your email to orders you own. You choose the order; the agent cannot switch accounts later.
         </p>
       </section>
 
       <section className={styles.section}>
-        <p className="eyebrow">What the agent can do</p>
+        <p className="eyebrow">What happens next</p>
         <ol className={styles.steps}>
-          <li>Read the matched customer and order</li>
-          <li>Apply the published refund policy</li>
-          <li>Record an approved refund, queue manager review, or explain a denial</li>
+          <li>Confirm the customer and order on file</li>
+          <li>Apply the live refund policy checklist</li>
+          <li>Approve a refund, send it for review, escalate, or explain a denial</li>
         </ol>
       </section>
 
@@ -26,7 +26,7 @@ export function SupportPortalPanel({ merchantName }: { merchantName?: string }) 
         <ShieldCheck size={16} />
         <div>
           <strong>Identity stays bound</strong>
-          <span>After the session starts, the agent cannot switch to a different customer or order.</span>
+          <span>Once the session starts, the agent cannot jump to a different customer or order.</span>
         </div>
       </div>
     </div>

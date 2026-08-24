@@ -60,7 +60,7 @@ export function SupportPortalGate({
         <div className={styles.intro}>
           <h2 id="support-session-title">Choose an order</h2>
           <p>
-            Hi {lookup.customerName.split(" ")[0]}. Select the order you need help with. Support stays locked to that order
+            Hi {lookup.customerName.split(" ")[0]}. Pick the order you need help with. This chat stays locked to that order
             for the rest of the session.
           </p>
         </div>
@@ -136,7 +136,10 @@ export function SupportPortalGate({
     <section className={styles.shell} aria-labelledby="support-session-title">
       <div className={styles.intro}>
         <h2 id="support-session-title">Look up your order</h2>
-        <p>Enter the email on your {storeName} order. We’ll show matching orders so you don’t need the raw order ID.</p>
+        <p>
+          Enter the email on your {storeName} account. We’ll list matching orders so you can start support without hunting
+          for an order ID.
+        </p>
       </div>
 
       <form
