@@ -52,3 +52,10 @@ RECORDING TIPS
 • Speak slightly slower than normal; Loom compresses audio.
 • If the agent is slow, narrate over the waiting state — don’t go silent.
 • After export: attach the Loom (or MP4) to the LinkedIn post with LINKEDIN_POST.txt as the caption.
+
+GENERATED VIDEO (ready to attach)
+---------------------------------
+File: docs/linkedin-video/jobform-linkedin-demo.mp4
+Also copied to: ~/Downloads/jobform-linkedin-demo.mp4
+Length: ~32s | Voice: OpenAI tts-1 / nova (same as product TTS)
+Frames: landing → support chat → admin customers → staff login

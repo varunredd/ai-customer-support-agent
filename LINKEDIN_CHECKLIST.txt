@@ -9,7 +9,8 @@ Must-do
     - /support email lookup → session → one refund OR escalation path
     - Admin conversations + escalations still show after a refresh
 [ ] Confirm Railway volume + DATABASE_PATH so sessions don’t wipe mid-demo.
-[ ] Record the 30–60s Loom using LINKEDIN_LOOM_SCRIPT.txt (I can’t record it for you).
+[x] Demo video ready: docs/linkedin-video/jobform-linkedin-demo.mp4 (also ~/Downloads/jobform-linkedin-demo.mp4)
+[ ] Attach that MP4 to the LinkedIn post (OpenAI TTS voice = app nova/tts-1).
 [ ] Paste LINKEDIN_POST.txt (full or short version) as the LinkedIn caption.
 [ ] Attach Loom / MP4 + 1–2 screenshots (landing + support outcome).
 
