@@ -15,15 +15,15 @@ Live storefront integration: **NovaShop** customers open Jobform from an order. 
 ### Product walkthrough
 
 <p align="center">
-  <a href="docs/demo/jobform-product-demo.mp4">
-    <img src="docs/demo/poster.jpg" alt="Jobform product walkthrough" width="720" />
+  <a href="https://youtu.be/88rlO-5ko54">
+    <img src="https://i.ytimg.com/vi/88rlO-5ko54/maxresdefault.jpg" alt="Jobform product walkthrough — watch on YouTube" width="720" />
   </a>
 </p>
 
 <p align="center">
   NovaShop → order context → AI support → policy → refunds
   <br /><br />
-  <a href="docs/demo/jobform-product-demo.mp4"><b>Watch demo</b></a>
+  <a href="https://youtu.be/88rlO-5ko54"><b>Watch demo on YouTube</b></a>
   &nbsp;·&nbsp;
   <a href="https://jobform-production.up.railway.app">Live app</a>
   &nbsp;·&nbsp;
