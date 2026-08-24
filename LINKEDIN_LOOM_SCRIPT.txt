@@ -1,61 +1,39 @@
-JOBFORM — LinkedIn Loom (30–60 seconds)
-=====================================
-I cannot record the Loom video from here. Use this as a teleprompter while you screen-record.
+JOBFORM — LinkedIn demo video (production cut)
+==============================================
 
-Target length: ~45 seconds (stay under 60).
-Tools: Loom (Chrome) or QuickTime + upload.
-Aspect: record browser window at 1440×900 or larger.
+Generated file (attach this):
+  docs/linkedin-video/jobform-linkedin-demo.mp4
+  ~/Downloads/jobform-linkedin-demo.mp4
 
-PREP (before you hit record)
-----------------------------
-1. Open three tabs in this order:
-   A) https://jobform-production.up.railway.app
-   B) https://jobform-production.up.railway.app/support
-   C) /admin conversations or escalations (already signed in; do NOT show passwords on camera)
-2. Have a demo email ready (e.g. maya.returns@example.com) and one clear refund prompt.
-3. Hide bookmarks bar / personal tabs. Zoom browser to ~110% so text reads on mobile LinkedIn.
-4. Close Slack/email notifications.
+Length: ~37s
+Voice: OpenAI tts-1 / onyx (not nova)
+Source frames: .data/demo-screenshots (NovaShop + Jobform)
 
-SHOT LIST + SCRIPT
-------------------
-0:00–0:08  LANDING
-Show `/`. Hover CTAs briefly.
-Say:
-"We built Jobform — AI customer support for refunds. The agent talks to the customer. Policy decides the money."
+NARRATION (final)
+-----------------
+We built Jobform as production AI refund support for commerce — paired with NovaShop, a real storefront.
 
-0:08–0:22  SUPPORT PORTAL
-Switch to `/support`. Enter email → pick order → start chat. Type (or paste) one short refund request.
-Say:
-"Customers look up an order, stay locked to that account, and ask for help in chat or by voice."
+Customers shop and track orders in NovaShop. When they need help, Jobform opens support locked to that customer and that order.
 
-0:22–0:40  OUTCOME
-Scroll to show policy activity / refund card OR escalation card — whichever your demo produces cleanly.
-If refund: click once so the amount is visible.
-If escalate: show the Human Support card, then briefly open Admin → Escalations.
-Say:
-"Under the hood, deterministic policy checks approve, deny, or escalate — and the ledger re-validates before anything is written."
+The agent runs the conversation — chat or microphone. A deterministic policy engine decides eligibility and amount. The ledger re-validates before anything is written.
 
-0:40–0:50  CLOSE
-Return to landing (or GitHub README if you prefer).
-Say:
-"Live demo and source are linked in the post. Happy to take feedback."
+Ops teams see the same truth in the staff console: conversations, the refund ledger, published policy checklists, and store integrations.
 
-Stop. Do not keep talking past 60s.
+Policy decides the money. The agent handles the conversation.
 
-BACKUP PROMPT (paste into chat if needed)
------------------------------------------
-Return my studio headphones. I changed my mind. They are unopened and I want to return quantity 1.
-
-RECORDING TIPS
+FRAME SEQUENCE
 --------------
-• One take is better than polish. LinkedIn rewards clarity over production.
-• Speak slightly slower than normal; Loom compresses audio.
-• If the agent is slow, narrate over the waiting state — don’t go silent.
-• After export: attach the Loom (or MP4) to the LinkedIn post with LINKEDIN_POST.txt as the caption.
+01  store-03-after-login       NovaShop signed-in shop home
+02  store-08-order-details     Order tracking / account
+03  local-01-landing           Jobform product home
+04  local-03-support-portal    Email order lookup
+05  local-04-order-picker      Order-locked session start
+06  local-05-support-workspace Agent chat + voice path
+07  local-07b-conversation     Staff conversations inbox
+08  local-09-refunds           Refunds ledger
+09  local-15-policies          Policy draft/publish
+10  local-16-integrations      Commerce / webhook vault
 
-GENERATED VIDEO (ready to attach)
----------------------------------
-File: docs/linkedin-video/jobform-linkedin-demo.mp4
-Also copied to: ~/Downloads/jobform-linkedin-demo.mp4
-Length: ~32s | Voice: OpenAI tts-1 / nova (same as product TTS)
-Frames: landing → support chat → admin customers → staff login
+POST
+----
+Paste LINKEDIN_POST.txt as the caption and attach the MP4.

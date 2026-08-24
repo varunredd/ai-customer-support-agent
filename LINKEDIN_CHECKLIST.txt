@@ -10,9 +10,9 @@ Must-do
     - Admin conversations + escalations still show after a refresh
 [ ] Confirm Railway volume + DATABASE_PATH so sessions don’t wipe mid-demo.
 [x] Demo video ready: docs/linkedin-video/jobform-linkedin-demo.mp4 (also ~/Downloads/jobform-linkedin-demo.mp4)
-[ ] Attach that MP4 to the LinkedIn post (OpenAI TTS voice = app nova/tts-1).
+[ ] Attach that MP4 to the LinkedIn post (OpenAI TTS voice = onyx / tts-1; NovaShop + Jobform frames).
 [ ] Paste LINKEDIN_POST.txt (full or short version) as the LinkedIn caption.
-[ ] Attach Loom / MP4 + 1–2 screenshots (landing + support outcome).
+[ ] Attach Loom / MP4 + 1–2 still screenshots if you want a cover frame.
 
 Safety
 ------

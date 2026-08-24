@@ -1,35 +1,32 @@
-We built Jobform — AI customer support for e-commerce refunds where the model never gets to decide the money.
+We built Jobform — production AI refund support for commerce, paired with NovaShop as the live storefront.
 
-The usual failure mode with “AI support” is simple: the chatbot sounds confident and invents an approval. Jobform flips that. The agent runs the conversation (text or voice). A deterministic policy engine decides eligibility and amount. An idempotent ledger writes the refund. Staff can escalate, approve edge cases, and inspect the full run.
+The usual AI-support failure mode is simple: the chatbot sounds confident and invents an approval. Jobform flips that.
 
-What’s real in the demo:
-• Order-locked support sessions (portal lookup or store-launched handoff)
-• Tool-using agent with live policy checks
-• Refund execution that re-validates inside a transaction
-• Voice on the same path as typed chat
-• Staff console for conversations, escalations, refunds, and policy
+Customers shop and track orders in NovaShop. When they need help, Jobform opens support locked to that customer and that order. The agent runs the conversation — chat or microphone. A deterministic policy engine decides eligibility and amount. The ledger re-validates before anything is written.
+
+Ops teams work from the same system of record: conversations, refund ledger, published policy checklists, and store integrations. The model never gets financial authority.
 
 Try it:
 Demo → https://jobform-production.up.railway.app
-Support portal → https://jobform-production.up.railway.app/support
+Support → https://jobform-production.up.railway.app/support
 Code → https://github.com/varunredd/ai-customer-support-agent
 
-If you work on AI products, support ops, or commerce infrastructure — would love feedback. Happy to walk through the architecture.
+If you work on AI products, support ops, or commerce infrastructure — feedback welcome.
 
 #AI #CustomerSupport #Ecommerce #NextJS #BuildInPublic
 
 ---
-SHORT VERSION (if you prefer a tighter post)
+SHORT VERSION
 ---
 
 We built Jobform: AI refund support where policy — not the LLM — decides the money.
 
-Customers chat (or speak). The agent investigates. Fifty deterministic checks approve, deny, or escalate. The ledger re-validates before it writes.
+NovaShop is the storefront. Jobform is the support layer: order-locked chat/voice, deterministic policy, idempotent ledger, and a full staff console.
 
 Demo: https://jobform-production.up.railway.app
 Support: https://jobform-production.up.railway.app/support
 GitHub: https://github.com/varunredd/ai-customer-support-agent
 
-Curious what other teams would harden next — feedback welcome.
+Feedback welcome.
 
 #AI #CustomerSupport #NextJS
