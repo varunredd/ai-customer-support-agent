@@ -3,6 +3,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .content {
@@ -32,4 +33,11 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .title {
+    font-size: 1.25rem;
+  }
 }

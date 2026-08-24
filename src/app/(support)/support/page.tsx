@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { RotateCcw } from "lucide-react";
+import { PanelRight, RotateCcw, X } from "lucide-react";
+import clsx from "clsx";
 import type { PersistedAgentEvent } from "@/domain/agent/types";
 import type { SupportMessage, SupportSessionDetail } from "@/domain/support/types";
 import { ChatComposer } from "@/components/chat/ChatComposer";
@@ -71,6 +72,7 @@ export default function SupportPage() {
   const [voicePhase, setVoicePhase] = useState<"idle" | "generating" | "playing">("idle");
   const [voicePlaybackError, setVoicePlaybackError] = useState<string | null>(null);
   const [branding, setBranding] = useState<TenantBranding | null>(null);
+  const [contextOpen, setContextOpen] = useState(false);
 
   const stopPlayback = useCallback(() => {
     const audio = audioRef.current;
@@ -433,7 +435,7 @@ export default function SupportPage() {
     : undefined;
 
   return (
-    <div className={styles.layout} style={layoutStyle}>
+    <div className={clsx(styles.layout, contextOpen && styles.contextVisible)} style={layoutStyle}>
       <div className={styles.chatArea}>
         <header className={styles.header}>
           <div className={styles.titleBlock}>
@@ -450,9 +452,20 @@ export default function SupportPage() {
             <p className={styles.session}>{sessionSubtitle}</p>
           </div>
           <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={styles.contextToggle}
+              onClick={() => setContextOpen((open) => !open)}
+              aria-expanded={contextOpen}
+              aria-controls="support-context-panel"
+            >
+              {contextOpen ? <X size={14} /> : <PanelRight size={14} />}
+              <span>{contextOpen ? "Close" : "Details"}</span>
+            </button>
             {detail ? (
               <button type="button" className={styles.newSessionButton} onClick={handleNewSession} disabled={isSending || voice.isActive}>
-                <RotateCcw size={14} /> New session
+                <RotateCcw size={14} />
+                <span>New session</span>
               </button>
             ) : null}
           </div>
@@ -517,7 +530,16 @@ export default function SupportPage() {
         ) : null}
       </div>
 
-      <aside className={styles.contextArea}>
+      {contextOpen ? (
+        <button
+          type="button"
+          className={styles.contextScrim}
+          aria-label="Close order details"
+          onClick={() => setContextOpen(false)}
+        />
+      ) : null}
+
+      <aside id="support-context-panel" className={styles.contextArea}>
         {detail ? (
           <ContextPanel customer={detail.customer} order={detail.order} workspace={detail.workspace} />
         ) : entry?.portal ? (

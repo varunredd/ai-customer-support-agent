@@ -44,6 +44,7 @@
   margin: 0;
   font-size: 0.9rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .detailsGrid {
@@ -127,12 +128,14 @@
   font-size: 0.95rem;
   color: var(--text);
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .itemSku {
   font-size: 0.8rem;
   color: var(--muted);
   font-family: var(--font-mono);
+  overflow-wrap: anywhere;
 }
 
 .itemPrice {
@@ -226,4 +229,14 @@
 .policyVersion {
   font-family: var(--font-mono);
   font-size: 0.74rem;
+}
+
+@media (max-width: 480px) {
+  .panel {
+    padding: 14px;
+  }
+
+  .checkList li {
+    grid-template-columns: 1fr;
+  }
 }

@@ -2,7 +2,8 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  max-width: 78%;
+  max-width: min(78%, 100%);
+  min-width: 0;
 }
 
 .agentWrapper {
@@ -42,11 +43,13 @@
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  flex: 1;
 }
 
 .meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 0 4px;
 }
@@ -71,6 +74,8 @@
   border-radius: 18px;
   font-size: 1rem;
   line-height: 1.55;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .agentBubble {
@@ -118,4 +123,15 @@
 
 @keyframes messageSpin {
   to { transform: rotate(360deg); }
+}
+
+@media (max-width: 680px) {
+  .messageWrapper {
+    max-width: 92%;
+  }
+
+  .bubble {
+    font-size: 0.95rem;
+    padding: 10px 14px;
+  }
 }

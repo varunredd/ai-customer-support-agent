@@ -48,6 +48,7 @@
   font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--accent-text);
+  overflow-wrap: anywhere;
 }
 
 .content p {
@@ -55,4 +56,13 @@
   color: var(--muted-strong);
   line-height: 1.5;
   font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .titleRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
 }

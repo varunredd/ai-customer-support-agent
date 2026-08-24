@@ -2,8 +2,10 @@
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
+  flex-wrap: wrap;
   gap: 8px;
   margin-left: 42px;
+  max-width: calc(100% - 42px);
   padding: 7px 10px;
   border-radius: 999px;
   background: white;
@@ -14,6 +16,7 @@
 .dot {
   width: 7px;
   height: 7px;
+  flex-shrink: 0;
   background: var(--accent);
   border-radius: 50%;
   animation: pulse 1.4s ease-in-out infinite;
@@ -28,4 +31,12 @@
   font-size: 0.85rem;
   color: var(--muted-strong);
   font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 680px) {
+  .logWrapper {
+    margin-left: 0;
+    max-width: 100%;
+  }
 }

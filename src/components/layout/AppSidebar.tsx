@@ -12,6 +12,7 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  Menu,
   MessageSquare,
   Plug,
   Receipt,
@@ -21,6 +22,7 @@ import {
   Shield,
   UserRoundCheck,
   Users,
+  X,
 } from "lucide-react";
 import clsx from "clsx";
 import { formatStaffRole } from "@/lib/format";
@@ -89,6 +91,7 @@ export function AppSidebar() {
   const [email, setEmail] = useState<string | null>(null);
   const [role, setRole] = useState<StaffRole | null>(null);
   const [permissions, setPermissions] = useState<StaffPermission[]>([]);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const publicSurface = PUBLIC_PATHS.some((path) => pathname === path || (path !== "/" && pathname.startsWith(`${path}/`)));
 
@@ -111,6 +114,19 @@ export function AppSidebar() {
     };
   }, [publicSurface]);
 
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileOpen]);
+
   if (publicSurface) return null;
 
   async function signOut() {
@@ -125,54 +141,76 @@ export function AppSidebar() {
   }
 
   return (
-    <aside className={styles.sidebar}>
-      <div className={styles.header}>
-        <div className={styles.logo}>
-          <div className={styles.logoIcon}>
-            <Bot size={18} />
-          </div>
-          <div>
-            <span className={styles.logoText}>Jobform</span>
-            <span className={styles.logoSub}>Admin</span>
-          </div>
-        </div>
-      </div>
+    <>
+      <button
+        type="button"
+        className={styles.mobileToggle}
+        aria-expanded={mobileOpen}
+        aria-controls="admin-sidebar"
+        onClick={() => setMobileOpen((open) => !open)}
+      >
+        {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+        <span className={styles.srOnly}>{mobileOpen ? "Close navigation" : "Open navigation"}</span>
+      </button>
 
-      <nav className={styles.nav}>
-        {NAV_SECTIONS.map((section) => {
-          const items = section.items.filter((item) => !item.permission || permissions.includes(item.permission));
-          if (items.length === 0) return null;
-          return (
-            <div key={section.label} className={styles.navSection}>
-              {section.label !== "Overview" ? <p className={styles.sectionLabel}>{section.label}</p> : null}
-              {items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={clsx(styles.navItem, isActive(item) && styles.navItemActive)}
-                >
-                  {item.icon}
-                  {item.label}
-                </Link>
-              ))}
+      {mobileOpen ? (
+        <button
+          type="button"
+          className={styles.mobileScrim}
+          aria-label="Close navigation"
+          onClick={() => setMobileOpen(false)}
+        />
+      ) : null}
+
+      <aside id="admin-sidebar" className={clsx(styles.sidebar, mobileOpen && styles.sidebarOpen)}>
+        <div className={styles.header}>
+          <div className={styles.logo}>
+            <div className={styles.logoIcon}>
+              <Bot size={18} />
             </div>
-          );
-        })}
-      </nav>
-
-      <div className={styles.footer}>
-        <div className={styles.user}>
-          <div className={styles.avatar}>{(email ?? "ST").slice(0, 2).toUpperCase()}</div>
-          <div className={styles.userInfo}>
-            <span className={styles.userName}>{email ?? "Staff"}</span>
-            <span className={styles.userRole}>{role ? formatStaffRole(role) : "Operations"}</span>
+            <div>
+              <span className={styles.logoText}>Jobform</span>
+              <span className={styles.logoSub}>Admin</span>
+            </div>
           </div>
         </div>
-        <button type="button" className={styles.navItem} onClick={() => void signOut()}>
-          <LogOut size={16} />
-          Sign out
-        </button>
-      </div>
-    </aside>
+
+        <nav className={styles.nav}>
+          {NAV_SECTIONS.map((section) => {
+            const items = section.items.filter((item) => !item.permission || permissions.includes(item.permission));
+            if (items.length === 0) return null;
+            return (
+              <div key={section.label} className={styles.navSection}>
+                {section.label !== "Overview" ? <p className={styles.sectionLabel}>{section.label}</p> : null}
+                {items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={clsx(styles.navItem, isActive(item) && styles.navItemActive)}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            );
+          })}
+        </nav>
+
+        <div className={styles.footer}>
+          <div className={styles.user}>
+            <div className={styles.avatar}>{(email ?? "ST").slice(0, 2).toUpperCase()}</div>
+            <div className={styles.userInfo}>
+              <span className={styles.userName}>{email ?? "Staff"}</span>
+              <span className={styles.userRole}>{role ? formatStaffRole(role) : "Operations"}</span>
+            </div>
+          </div>
+          <button type="button" className={styles.navItem} onClick={() => void signOut()}>
+            <LogOut size={16} />
+            Sign out
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

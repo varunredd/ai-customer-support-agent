@@ -105,7 +105,8 @@
 }
 
 .adminLink,
-.newSessionButton {
+.newSessionButton,
+.contextToggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -120,6 +121,15 @@
   font-family: inherit;
 }
 
+.contextToggle {
+  display: none;
+  cursor: pointer;
+}
+
+.contextScrim {
+  display: none;
+}
+
 .newSessionButton {
   cursor: pointer;
 }
@@ -130,7 +140,8 @@
 }
 
 .adminLink:hover,
-.newSessionButton:hover:not(:disabled) {
+.newSessionButton:hover:not(:disabled),
+.contextToggle:hover {
   background: var(--bg-subtle);
   color: var(--text);
 }
@@ -204,45 +215,110 @@
 
 @media (max-width: 1100px) {
   .layout {
+    position: relative;
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .contextToggle {
+    display: inline-flex;
   }
 
   .contextArea {
-    max-height: 42vh;
+    display: none;
+    position: absolute;
+    z-index: 30;
+    inset: auto 18px 18px 18px;
+    max-height: min(68vh, 560px);
+    box-shadow: var(--shadow);
+  }
+
+  .contextVisible .contextArea {
+    display: flex;
+  }
+
+  .contextScrim {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 25;
+    border: 0;
+    background: rgba(28, 24, 36, 0.28);
+    backdrop-filter: blur(2px);
+    cursor: pointer;
   }
 }
 
 @media (max-width: 680px) {
   .layout {
-    padding: 10px;
-    gap: 10px;
+    padding: 8px;
+    gap: 8px;
   }
 
   .chatArea,
   .contextArea {
-    border-radius: 20px;
+    border-radius: 18px;
   }
 
   .header {
-    padding: 12px 14px;
+    padding: 10px 12px;
     align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .titleRow {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .title {
+    min-width: 0;
+    font-size: 1.05rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: min(100%, 52vw);
   }
 
   .session {
-    max-width: 58vw;
+    max-width: none;
   }
 
+  .headerActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .contextToggle,
   .newSessionButton {
-    padding: 8px;
+    padding: 8px 10px;
   }
 
-  .newSessionButton svg + * {
+  .newSessionButton span {
     display: none;
   }
 
+  .setupHistory {
+    padding: 16px 14px 20px;
+  }
+
   .chatHistory {
-    padding: 20px 14px;
+    padding: 16px 12px;
+  }
+
+  .composerArea {
+    padding: 12px 12px 14px;
+  }
+
+  .hint {
+    font-size: 0.74rem;
+    line-height: 1.4;
+  }
+
+  .contextArea {
+    inset: auto 8px 8px 8px;
+    max-height: min(72vh, 620px);
   }
 }
 

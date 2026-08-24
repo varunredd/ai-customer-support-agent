@@ -126,3 +126,14 @@
 .back:hover {
   color: var(--text);
 }
+
+@media (max-width: 480px) {
+  .page {
+    padding: 16px;
+    align-items: flex-start;
+  }
+
+  .card {
+    padding: 20px 18px 18px;
+  }
+}
