@@ -63,8 +63,15 @@ const SCENES = [
   },
 ];
 
-const XFADE = 0.55;
-const PAD_AFTER = 0.35; // hold after each line so speech isn't clipped by the crossfade
+const XFADE = 0.5;
+/** Quiet before the line starts on a new frame (lets the transition settle). */
+const PAD_BEFORE = 0.45;
+/**
+ * Quiet after each line while the same frame is still on screen.
+ * Must be longer than XFADE so the next voice never overlaps the previous line
+ * during the picture crossfade (that was making scenes feel mixed together).
+ */
+const PAD_AFTER = 1.25;
 
 function loadEnvLocal(filePath) {
   const out = {};
@@ -151,8 +158,10 @@ async function synthesize(env, text, outFile) {
   throw new Error(`TTS failed\n${lastError}`);
 }
 
+const VOICE_CACHE = path.join(OUT, "voice-cache");
 fs.rmSync(WORK, { recursive: true, force: true });
 fs.mkdirSync(WORK, { recursive: true });
+fs.mkdirSync(VOICE_CACHE, { recursive: true });
 
 const env = loadEnvLocal(path.join(ROOT, ".env.local"));
 const narrationLines = [];
@@ -161,7 +170,8 @@ const usedVoice = { model: "", voice: "" };
 for (const scene of SCENES) {
   const srcImage = path.join(SRC, scene.image);
   const frame = path.join(WORK, `${scene.id}-frame.png`);
-  const audio = path.join(WORK, `${scene.id}-voice.mp3`);
+  const speechRaw = path.join(VOICE_CACHE, `${scene.id}-speech.mp3`);
+  const audio = path.join(WORK, `${scene.id}-voice-padded.m4a`);
   const clip = path.join(WORK, `${scene.id}-clip.mp4`);
 
   run(
@@ -177,14 +187,44 @@ for (const scene of SCENES) {
     `normalize ${scene.id}`,
   );
 
-  const voiceMeta = await synthesize(env, scene.line, audio);
-  usedVoice.model = voiceMeta.model;
-  usedVoice.voice = voiceMeta.voice;
-  const speechDur = probeDuration(audio);
-  const clipDur = speechDur + PAD_AFTER;
-  narrationLines.push(`${scene.id}\t${clipDur.toFixed(2)}s\t${scene.line}`);
+  if (!fs.existsSync(speechRaw) || fs.statSync(speechRaw).size < 1000) {
+    const voiceMeta = await synthesize(env, scene.line, speechRaw);
+    usedVoice.model = voiceMeta.model;
+    usedVoice.voice = voiceMeta.voice;
+  } else if (!usedVoice.model) {
+    usedVoice.model = "cached";
+    usedVoice.voice = "marin";
+  }
 
-  // Still image + timed audio, soft fade in/out on picture
+  const speechDur = probeDuration(speechRaw);
+  const clipDur = PAD_BEFORE + speechDur + PAD_AFTER;
+  narrationLines.push(
+    `${scene.id}\t${clipDur.toFixed(2)}s\t(pre ${PAD_BEFORE}s + speech ${speechDur.toFixed(2)}s + pause ${PAD_AFTER}s)\t${scene.line}`,
+  );
+
+  // Explicit lead-in + trail silence so the next scene never talks over this one.
+  const delayMs = Math.round(PAD_BEFORE * 1000);
+  run(
+    "ffmpeg",
+    [
+      "-y",
+      "-i",
+      speechRaw,
+      "-af",
+      `adelay=${delayMs}:all=1,apad=pad_dur=${PAD_AFTER.toFixed(3)}`,
+      "-t",
+      clipDur.toFixed(3),
+      "-c:a",
+      "aac",
+      "-b:a",
+      "192k",
+      audio,
+    ],
+    `pad audio ${scene.id}`,
+  );
+
+  // Still image + padded audio; picture fade lives inside the quiet trail.
+  const fadeOutStart = Math.max(PAD_BEFORE + speechDur + 0.15, clipDur - XFADE);
   run(
     "ffmpeg",
     [
@@ -196,7 +236,7 @@ for (const scene of SCENES) {
       "-i",
       audio,
       "-vf",
-      `fade=t=in:st=0:d=0.35,fade=t=out:st=${Math.max(0.2, clipDur - 0.4).toFixed(3)}:d=0.4,fps=30,format=yuv420p`,
+      `fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${XFADE.toFixed(3)},fps=30,format=yuv420p`,
       "-c:v",
       "libx264",
       "-tune",
@@ -216,7 +256,9 @@ for (const scene of SCENES) {
   );
 }
 
-// Crossfade video chain + acrossfade audio chain
+// Crossfade pictures only inside the quiet gap after each line.
+// Audio uses the same acrossfade window, but that window is silence-only
+// (PAD_AFTER / PAD_BEFORE), so voices never overlap or feel mixed.
 const clips = SCENES.map((s) => path.join(WORK, `${s.id}-clip.mp4`));
 const durations = clips.map((c) => probeDuration(c));
 
