@@ -6,26 +6,29 @@
 [![OpenAI](https://img.shields.io/badge/OpenAI-Responses_+_Voice-412991?style=flat-square)](https://platform.openai.com/)
 [![Policy engine](https://img.shields.io/badge/Refund_policy-50_deterministic_checks-0F766E?style=flat-square)](#how-it-works)
 
-<p align="center">
-  <a href="docs/demo/jobform-product-demo.mp4">
-    <img src="docs/demo/poster.jpg" alt="Jobform product walkthrough — NovaShop to AI support to refunds" width="860" />
-  </a>
-  <br />
-  <b>Product walkthrough</b> · NovaShop → order context → AI support → policy → refunds<br />
-  <a href="docs/demo/jobform-product-demo.mp4"><b>Watch the demo</b></a>
-  ·
-  <a href="https://jobform-production.up.railway.app">Live app</a>
-  ·
-  <a href="https://jobform-production.up.railway.app/support">Support portal</a>
-</p>
-
-https://github.com/varunredd/ai-customer-support-agent/raw/main/docs/demo/jobform-product-demo.mp4
-
 A production-shaped **AI customer-support product** for e-commerce refunds.
 
 The model runs the conversation. A **deterministic policy engine** decides eligibility and amount. A transactional ledger writes the refund. The LLM **cannot** approve money the policy would deny.
 
 Live storefront integration: **NovaShop** customers open Jobform from an order. Approved refunds write back to the store (return status, pickup, tracking).
+
+### Product walkthrough
+
+<p align="center">
+  <a href="docs/demo/jobform-product-demo.mp4">
+    <img src="docs/demo/poster.jpg" alt="Jobform product walkthrough" width="720" />
+  </a>
+</p>
+
+<p align="center">
+  NovaShop → order context → AI support → policy → refunds
+  <br /><br />
+  <a href="docs/demo/jobform-product-demo.mp4"><b>Watch demo</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://jobform-production.up.railway.app">Live app</a>
+  &nbsp;·&nbsp;
+  <a href="https://jobform-production.up.railway.app/support">Support portal</a>
+</p>
 
 ---
 
