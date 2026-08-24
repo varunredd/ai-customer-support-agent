@@ -1,39 +1,28 @@
-JOBFORM — LinkedIn demo video (production cut)
-==============================================
+JOBFORM — LinkedIn demo video (v3 production cut)
+=================================================
 
-Generated file (attach this):
+Attach:
   docs/linkedin-video/jobform-linkedin-demo.mp4
   ~/Downloads/jobform-linkedin-demo.mp4
 
-Length: ~37s
-Voice: OpenAI tts-1 / onyx (not nova)
-Source frames: .data/demo-screenshots (NovaShop + Jobform)
+Voice: gpt-4o-mini-tts / marin (smooth launch narrator; not nova/onyx)
+Transitions: crossfade between frames
+Sync: one spoken beat per frame (see scene-timing.txt)
 
-NARRATION (final)
------------------
-We built Jobform as production AI refund support for commerce — paired with NovaShop, a real storefront.
+Rebuild anytime:
+  node scripts/build-linkedin-demo-video.mjs
 
-Customers shop and track orders in NovaShop. When they need help, Jobform opens support locked to that customer and that order.
+FRAME + LINE ORDER
+------------------
+01 NovaShop home          Introducing Jobform…
+02 NovaShop order         Pairs with NovaShop…
+03 Jobform landing        Policy decides the money…
+04 Support lookup         Portal with email…
+05 Order picker           Session locked to that customer…
+06 Support workspace      Text or voice — same path…
+07 Admin conversations    Visible to staff…
+08 Refunds ledger         Idempotent ledger…
+09 Policies               Checklist the agent must follow…
+10 Integrations           Production support — not a chatbot demo.
 
-The agent runs the conversation — chat or microphone. A deterministic policy engine decides eligibility and amount. The ledger re-validates before anything is written.
-
-Ops teams see the same truth in the staff console: conversations, the refund ledger, published policy checklists, and store integrations.
-
-Policy decides the money. The agent handles the conversation.
-
-FRAME SEQUENCE
---------------
-01  store-03-after-login       NovaShop signed-in shop home
-02  store-08-order-details     Order tracking / account
-03  local-01-landing           Jobform product home
-04  local-03-support-portal    Email order lookup
-05  local-04-order-picker      Order-locked session start
-06  local-05-support-workspace Agent chat + voice path
-07  local-07b-conversation     Staff conversations inbox
-08  local-09-refunds           Refunds ledger
-09  local-15-policies          Policy draft/publish
-10  local-16-integrations      Commerce / webhook vault
-
-POST
-----
-Paste LINKEDIN_POST.txt as the caption and attach the MP4.
+Caption: paste LINKEDIN_POST.txt
