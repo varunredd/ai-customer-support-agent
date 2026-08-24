@@ -9,69 +9,48 @@ const SRC = path.join(ROOT, ".data/demo-screenshots");
 const FINAL = path.join(OUT, "jobform-linkedin-demo.mp4");
 const DOWNLOADS = "/Users/varunreddy/Downloads/jobform-linkedin-demo.mp4";
 
-/** Launch-style lines — one beat per frame so audio and picture stay locked. */
+/** Short human beats — one line per frame. Keep under ~40s total. */
 const SCENES = [
   {
     id: "01",
     image: "store-03-after-login.png",
-    line: "Introducing Jobform — AI refund support built for real e-commerce operations.",
+    line: "AI support usually sounds confident… then invents a refund.",
   },
   {
     id: "02",
-    image: "store-08-order-details.png",
-    line: "It pairs with NovaShop, where customers shop, sign in, and track live orders.",
+    image: "local-01-landing.png",
+    line: "We built Jobform to stop that. The agent talks. Policy decides the money.",
   },
   {
     id: "03",
-    image: "local-01-landing.png",
-    line: "Jobform is the support layer. Policy decides the money. The agent handles the conversation.",
+    image: "store-08-order-details.png",
+    line: "It connects to a real store — NovaShop — with real customers and real orders.",
   },
   {
     id: "04",
-    image: "local-03-support-portal.png",
-    line: "Shoppers open the portal with the email on their account — no hunting for order IDs.",
+    image: "local-05-support-workspace.png",
+    line: "Customers ask for help in chat or by voice. Same agent. Same rules.",
   },
   {
     id: "05",
-    image: "local-04-order-picker.png",
-    line: "They choose an owned order, and the session stays locked to that customer for the whole chat.",
+    image: "local-09-refunds.png",
+    line: "If money moves, it only moves after the policy clears it.",
   },
   {
     id: "06",
-    image: "local-05-support-workspace.png",
-    line: "Text or voice — same agent, same tools, same refund path, with replies that can play aloud.",
-  },
-  {
-    id: "07",
-    image: "local-07b-conversation-detail.png",
-    line: "Every session is visible to staff — transcripts, status, and order context in one console.",
-  },
-  {
-    id: "08",
-    image: "local-09-refunds.png",
-    line: "Approved refunds hit an idempotent ledger after policy is re-checked in a transaction.",
-  },
-  {
-    id: "09",
     image: "local-15-policies.png",
-    line: "Merchants draft, validate, and publish the checklist the agent must follow — the model cannot override it.",
-  },
-  {
-    id: "10",
-    image: "local-16-integrations.png",
-    line: "Store sync, webhooks, and delivery health live here too. Production support — not a chatbot demo.",
+    line: "You set the rules. Jobform enforces them. That’s the product.",
   },
 ];
 
-const XFADE = 0.5;
+const XFADE = 0.45;
 /** Quiet before the line starts on a new frame (lets the transition settle). */
-const PAD_BEFORE = 0.45;
+const PAD_BEFORE = 0.35;
 /**
  * Quiet after each line while the same frame is still on screen.
- * Must be longer than XFADE so the next voice never overlaps the previous line
- * during the picture crossfade (that was making scenes feel mixed together).
+ * Must be longer than XFADE so the next voice never overlaps the previous line.
  */
-const PAD_AFTER = 1.25;
+const PAD_AFTER = 0.95;
 
 function loadEnvLocal(filePath) {
   const out = {};
@@ -114,7 +93,7 @@ async function synthesize(env, text, outFile) {
         input: text,
         response_format: "mp3",
         instructions:
-          "Speak as a polished product launch narrator. Smooth, clear, warm, and professional. Light midrange, no heavy bass, no gravel. Calm confidence, natural pacing, no hype.",
+          "Speak like a sharp founder on LinkedIn — natural, warm, and conversational. Short sentences. Light energy. No stiff presenter voice, no textbook tone, no heavy bass.",
       },
     },
     {

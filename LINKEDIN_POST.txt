@@ -1,17 +1,16 @@
-We just shipped Jobform — AI refund support built for real commerce operations.
+We built Jobform because most AI support tools sound smart — then invent a refund.
 
-Most “AI support” demos let the model invent approvals. Jobform does the opposite.
+Jobform flips that. The agent handles the conversation. Policy decides the money.
 
-Customers shop and track orders in NovaShop. When they need help, Jobform opens support locked to that customer and order. The agent runs the conversation — chat or voice. A deterministic policy engine decides eligibility and amount. The ledger re-validates before anything is written.
+It connects to a real store (NovaShop), with real customers and real orders. Shoppers ask for help in chat or by voice. Same agent. Same rules. If money moves, it only moves after policy clears it.
 
-Staff get the full ops surface: conversations, refunds ledger, published policy checklists, and store integrations. The model never gets financial authority.
+You set the rules. Jobform enforces them.
 
-Try the live product:
-Demo → https://jobform-production.up.railway.app
+Live demo → https://jobform-production.up.railway.app
 Support → https://jobform-production.up.railway.app/support
 Code → https://github.com/varunredd/ai-customer-support-agent
 
-If you build AI products, support tooling, or commerce systems — we’d love feedback.
+Would love feedback from folks building AI products or support ops.
 
 #AI #CustomerSupport #Ecommerce #NextJS #BuildInPublic
 
@@ -19,14 +18,12 @@ If you build AI products, support tooling, or commerce systems — we’d love f
 SHORT VERSION
 ---
 
-Shipping Jobform: AI refund support where policy — not the LLM — decides the money.
+Most AI support tools sound confident… then invent a refund.
 
-NovaShop is the storefront. Jobform is the support layer: order-locked chat/voice, deterministic policy, idempotent ledger, and a full staff console.
+We built Jobform to stop that.
+Agent talks. Policy decides the money.
 
-Live: https://jobform-production.up.railway.app
-Support: https://jobform-production.up.railway.app/support
+Demo: https://jobform-production.up.railway.app
 GitHub: https://github.com/varunredd/ai-customer-support-agent
-
-Feedback welcome.
 
 #AI #CustomerSupport #NextJS
