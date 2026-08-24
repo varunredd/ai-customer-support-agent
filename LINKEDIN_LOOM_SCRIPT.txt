@@ -1,21 +1,25 @@
-JOBFORM — LinkedIn demo (~40s)
-==============================
+JOBFORM — LinkedIn product demo (v4)
+====================================
 
 File:
   ~/Downloads/jobform-linkedin-demo.mp4
-  docs/linkedin-video/jobform-linkedin-demo.mp4
 
 Rebuild:
-  rm -rf docs/linkedin-video/voice-cache
+  rm -rf docs/linkedin-video/voice-cache-v4
   node scripts/build-linkedin-demo-video.mjs
 
-SCRIPT (6 beats)
-----------------
-1 NovaShop     AI support usually sounds confident… then invents a refund.
-2 Jobform      We built Jobform to stop that. The agent talks. Policy decides the money.
-3 Order        It connects to a real store — NovaShop — with real customers and real orders.
-4 Support chat Customers ask for help in chat or by voice. Same agent. Same rules.
-5 Refunds      If money moves, it only moves after the policy clears it.
-6 Policies     You set the rules. Jobform enforces them. That’s the product.
+SCREENS
+-------
+1  NovaShop home          (your new home screenshot)
+2  NovaShop products
+3  Order details
+4  Get help with this order
+4b Architecture animation NovaShop → Order Context → AI Support → Policy → Refund
+5  AI support agent       (longest beat)
+6  Staff login
+7  Admin overview
+8  Conversations
+9  Customers
+10 Refunds ledger         (closing)
 
 Caption: LINKEDIN_POST.txt

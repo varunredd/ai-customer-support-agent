@@ -1,29 +1,17 @@
-We built Jobform because most AI support tools sound smart — then invent a refund.
+I wanted to build an AI customer support agent that works with a real commerce experience — not just another chatbot running in isolation.
 
-Jobform flips that. The agent handles the conversation. Policy decides the money.
+So I integrated it with NovaShop, a sample storefront with real products, customers, and orders. The AI doesn’t need to own the shop. It connects to the business data that already exists.
 
-It connects to a real store (NovaShop), with real customers and real orders. Shoppers ask for help in chat or by voice. Same agent. Same rules. If money moves, it only moves after policy clears it.
+When a customer opens an order, the system already knows status, payment, tracking, and items — and they can get help without retyping everything. That context flows into Jobform: the AI support agent.
 
-You set the rules. Jobform enforces them.
+The agent can talk in text or voice. But it doesn’t invent refunds. Money decisions go through deterministic business policy first.
 
-Live demo → https://jobform-production.up.railway.app
+Staff still keep control — conversations, customers, escalations, and a refund ledger that makes every decision traceable.
+
+Demo → https://jobform-production.up.railway.app
 Support → https://jobform-production.up.railway.app/support
 Code → https://github.com/varunredd/ai-customer-support-agent
 
-Would love feedback from folks building AI products or support ops.
+This is only the beginning. Excited to keep building in AI agents and automation.
 
 #AI #CustomerSupport #Ecommerce #NextJS #BuildInPublic
-
----
-SHORT VERSION
----
-
-Most AI support tools sound confident… then invent a refund.
-
-We built Jobform to stop that.
-Agent talks. Policy decides the money.
-
-Demo: https://jobform-production.up.railway.app
-GitHub: https://github.com/varunredd/ai-customer-support-agent
-
-#AI #CustomerSupport #NextJS
